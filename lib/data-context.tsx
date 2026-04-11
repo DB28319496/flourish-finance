@@ -441,6 +441,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       try {
         const { doc, setDoc } = await import("firebase/firestore");
         const { db } = await import("./firebase");
+        if (!db) return;
         await setDoc(
           doc(db, "users", user.uid, "settings", "budget_targets"),
           newTargets,
@@ -498,6 +499,7 @@ Recent Transactions: ${rawTransactions.slice(0, 20).map((t) => `${t.date}: ${t.m
       try {
         const { doc, getDoc } = await import("firebase/firestore");
         const { db } = await import("./firebase");
+        if (!db) return;
         const snap = await getDoc(doc(db, "users", user.uid, "settings", "budget_targets"));
         if (snap.exists()) setBudgetTargets(snap.data() as Record<string, number>);
       } catch (err) {
