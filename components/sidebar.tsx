@@ -29,7 +29,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-[260px] bg-white border-r border-flourish-border fixed left-0 top-0 h-screen flex flex-col">
+    <aside className="w-[260px] min-w-[260px] bg-white border-r border-flourish-border h-screen flex flex-col">
       {/* Logo Section */}
       <div className="px-6 py-8 border-b border-flourish-border">
         <div className="flex items-center gap-2">
