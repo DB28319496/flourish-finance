@@ -302,7 +302,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [budgetTargets, setBudgetTargets] = useState<Record<string, number>>({});
   const [investmentHoldings, setInvestmentHoldings] = useState<HoldingGroup[]>([]);
 
-  const isUsingMockData = !user;
+  // Use mock data if not logged in OR if logged in but no real data was fetched
+  const hasRealData = accounts.length > 0 || rawTransactions.length > 0;
+  const isUsingMockData = !user || (!hasRealData && !isLoading);
 
   // -- Account groups
   const accountGroups = isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
