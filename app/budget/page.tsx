@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { Card, PillToggle, ProgressBar, SectionHeader } from "@/components/ui";
-import { budgetSections, formatCurrency } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/mock-data";
+import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -25,6 +26,8 @@ export default function BudgetPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [showUnbudgeted, setShowUnbudgeted] = useState<Set<string>>(new Set());
+
+  const { budgetSections, updateBudgetTarget } = useData();
 
   // Month navigation
   const monthStr = month.toLocaleDateString("en-US", {
@@ -62,6 +65,12 @@ export default function BudgetPage() {
   };
 
   const finishEdit = () => {
+    if (editingId && editValue) {
+      const amount = parseFloat(editValue);
+      if (!isNaN(amount)) {
+        updateBudgetTarget(editingId, amount);
+      }
+    }
     setEditingId(null);
   };
 

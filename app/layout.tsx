@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Sidebar } from '@/components/sidebar';
+import { AuthProvider } from '@/lib/auth-context';
+import { DataProvider } from '@/lib/data-context';
 import '@/app/globals.css';
 
 export default function RootLayout({
@@ -9,25 +11,24 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
   return (
     <html lang="en">
       <body className="bg-flourish-cream grain-overlay">
-        <div className="flex h-screen overflow-hidden">
-          {/* Sidebar */}
-          <Sidebar
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
+        <AuthProvider>
+          <DataProvider>
+            <div className="flex h-screen overflow-hidden">
+              {/* Sidebar */}
+              <Sidebar />
 
-          {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto">
-            <div className="px-12 py-10">
-              {children}
+              {/* Main Content Area */}
+              <main className="flex-1 overflow-y-auto">
+                <div className="p-8">
+                  {children}
+                </div>
+              </main>
             </div>
-          </main>
-        </div>
+          </DataProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -5,12 +5,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Calendar, Settings, Save, BarChart3 } from 'lucide-react';
 import { Card, PillToggle, SectionHeader, ProgressBar, Badge, Dropdown } from '@/components/ui';
 import {
-  reportData,
-  monthlyData,
   formatCurrency,
   formatCurrencyShort,
   formatPercent
 } from '@/lib/mock-data';
+import { useData } from '@/lib/data-context';
 import { cn } from '@/lib/utils';
 
 type ReportTab = 'cash-flow' | 'spending' | 'income';
@@ -19,30 +18,38 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('cash-flow');
   const [grouping, setGrouping] = useState('monthly');
 
+  const { monthlyData, flatTransactions, transactionStats } = useData();
+
+  // Compute summary from real data
+  const totalIncome = monthlyData.reduce((s, m) => s + m.income, 0);
+  const totalExpensesVal = monthlyData.reduce((s, m) => s + m.expenses, 0);
+  const netIncome = totalIncome - totalExpensesVal;
+  const savingsRateVal = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
+
   const summaryCards = [
     {
       label: 'Total Income',
-      value: formatCurrency(41769.91),
-      change: '+12.5%',
+      value: formatCurrency(totalIncome),
+      change: '',
       changeColor: 'text-green-600'
     },
     {
       label: 'Total Expenses',
-      value: formatCurrency(33006.95),
-      change: '-8.3%',
+      value: formatCurrency(totalExpensesVal),
+      change: '',
       changeColor: 'text-red-600'
     },
     {
       label: 'Net Income',
-      value: formatCurrency(8762.96),
-      change: '+28.4%',
-      changeColor: 'text-green-600'
+      value: formatCurrency(netIncome),
+      change: '',
+      changeColor: netIncome >= 0 ? 'text-green-600' : 'text-red-600'
     },
     {
       label: 'Savings Rate',
-      value: '21%',
-      change: '+3.2%',
-      changeColor: 'text-green-600'
+      value: `${Math.round(savingsRateVal)}%`,
+      change: '',
+      changeColor: savingsRateVal >= 0 ? 'text-green-600' : 'text-red-600'
     }
   ];
 
@@ -168,7 +175,7 @@ export default function ReportsPage() {
                 Recent Transactions
               </h3>
               <div className="space-y-3">
-                {reportData.transactions.slice(0, 8).map((txn, idx) => (
+                {flatTransactions.slice(0, 8).map((txn, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-3 hover:bg-flourish-hover rounded-lg transition-colors border-b border-flourish-border last:border-b-0"
@@ -206,7 +213,7 @@ export default function ReportsPage() {
                     Total Transactions
                   </p>
                   <p className="font-display text-2xl font-bold text-flourish-text">
-                    496
+                    {transactionStats.totalCount || flatTransactions.length}
                   </p>
                 </div>
                 <div className="h-px bg-flourish-border" />
@@ -215,7 +222,7 @@ export default function ReportsPage() {
                     Largest
                   </p>
                   <p className="font-display text-lg font-bold text-flourish-text">
-                    $2,450.00
+                    {formatCurrency(transactionStats.largest || 0)}
                   </p>
                 </div>
                 <div className="h-px bg-flourish-border" />
@@ -224,7 +231,7 @@ export default function ReportsPage() {
                     Average
                   </p>
                   <p className="font-display text-lg font-bold text-flourish-text">
-                    $66.71
+                    {formatCurrency(transactionStats.average || 0)}
                   </p>
                 </div>
                 <div className="h-px bg-flourish-border" />
@@ -233,7 +240,7 @@ export default function ReportsPage() {
                     Total Income
                   </p>
                   <p className="font-display text-lg font-bold text-green-600">
-                    $41,769.91
+                    {formatCurrency(totalIncome)}
                   </p>
                 </div>
                 <div className="h-px bg-flourish-border" />
@@ -242,7 +249,7 @@ export default function ReportsPage() {
                     Total Spending
                   </p>
                   <p className="font-display text-lg font-bold text-red-600">
-                    $33,006.95
+                    {formatCurrency(totalExpensesVal)}
                   </p>
                 </div>
               </div>

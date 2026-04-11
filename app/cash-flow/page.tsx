@@ -14,13 +14,11 @@ import {
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { Card, PillToggle, SectionHeader } from "@/components/ui";
 import {
-  cashFlowMonths,
-  expenseBreakdown,
-  incomeBreakdown,
   formatCurrency,
   formatCurrencyShort,
   formatPercent,
 } from "@/lib/mock-data";
+import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
 
 type TimePeriod = "Monthly" | "Quarterly" | "Yearly";
@@ -33,6 +31,8 @@ export default function CashFlowPage() {
   const [viewType, setViewType] = useState<ViewType>("Bar Chart");
   const [incomeView, setIncomeView] = useState<BreakdownView>("Category");
   const [expenseView, setExpenseView] = useState<BreakdownView>("Category");
+
+  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown } = useData();
 
   // Calculate summary stats from cash flow data
   const totalIncome = cashFlowMonths.reduce((sum, m) => sum + m.income, 0);

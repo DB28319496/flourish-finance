@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, MoreVertical } from 'lucide-react';
 import { Card, PillToggle, ProgressBar, Badge } from '@/components/ui';
-import { recurringData, formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
+import { formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
+import { useData } from '@/lib/data-context';
 import { cn, getMerchantColor } from '@/lib/utils';
 
 type RecurringFilter = 'monthly' | 'all';
@@ -51,9 +52,10 @@ export default function RecurringPage() {
     }));
   };
 
-  const incomeItems = recurringData.income;
-  const expenseItems = recurringData.expenses;
-  const creditCardItems = recurringData.creditCards;
+  const { recurringTransactions } = useData();
+  const incomeItems = recurringTransactions.income;
+  const expenseItems = recurringTransactions.expenses;
+  const creditCardItems = recurringTransactions.creditCards;
 
   const paidExpenses = expenseItems.filter(e => e.status === 'paid').length;
   const totalExpenses = expenseItems.length;

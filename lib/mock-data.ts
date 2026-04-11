@@ -316,18 +316,18 @@ export const recurringData = {
     { merchant: 'Freelance Client', amount: 1200, frequency: 'Monthly', status: 'upcoming', nextDate: 'Apr 30', daysUntil: 19, emoji: '💻', category: 'Freelance', dueDate: '30th' },
   ],
   expenses: [
-    { merchant: 'Rent Payment', amount: 1800, dueDate: '1st', category: 'Housing', status: 'paid', nextDate: 'May 1', daysUntil: 20, emoji: '🏠' },
-    { merchant: 'Car Insurance', amount: 145, dueDate: '5th', category: 'Insurance', status: 'paid', nextDate: 'May 5', daysUntil: 24, emoji: '🚗' },
-    { merchant: 'Netflix', amount: 15.99, dueDate: '10th', category: 'Entertainment', status: 'paid', nextDate: 'May 10', daysUntil: 29, emoji: '🎬' },
-    { merchant: 'Spotify', amount: 9.99, dueDate: '12th', category: 'Entertainment', status: 'paid', nextDate: 'May 12', daysUntil: 31, emoji: '🎵' },
-    { merchant: 'Gym Membership', amount: 49.99, dueDate: '15th', category: 'Health', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '🏋️' },
-    { merchant: 'Internet Provider', amount: 79.99, dueDate: '18th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 18', daysUntil: 7, emoji: '🌐' },
-    { merchant: 'Phone Bill', amount: 85, dueDate: '20th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 20', daysUntil: 9, emoji: '📱' },
-    { merchant: 'Student Loan', amount: 350, dueDate: '25th', category: 'Loans', status: 'upcoming', nextDate: 'Apr 25', daysUntil: 14, emoji: '🎓' },
+    { merchant: 'Rent Payment', amount: 1800, dueDate: '1st', category: 'Housing', status: 'paid', nextDate: 'May 1', daysUntil: 20, emoji: '🏠', frequency: 'Monthly' },
+    { merchant: 'Car Insurance', amount: 145, dueDate: '5th', category: 'Insurance', status: 'paid', nextDate: 'May 5', daysUntil: 24, emoji: '🚗', frequency: 'Monthly' },
+    { merchant: 'Netflix', amount: 15.99, dueDate: '10th', category: 'Entertainment', status: 'paid', nextDate: 'May 10', daysUntil: 29, emoji: '🎬', frequency: 'Monthly' },
+    { merchant: 'Spotify', amount: 9.99, dueDate: '12th', category: 'Entertainment', status: 'paid', nextDate: 'May 12', daysUntil: 31, emoji: '🎵', frequency: 'Monthly' },
+    { merchant: 'Gym Membership', amount: 49.99, dueDate: '15th', category: 'Health', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '🏋️', frequency: 'Monthly' },
+    { merchant: 'Internet Provider', amount: 79.99, dueDate: '18th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 18', daysUntil: 7, emoji: '🌐', frequency: 'Monthly' },
+    { merchant: 'Phone Bill', amount: 85, dueDate: '20th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 20', daysUntil: 9, emoji: '📱', frequency: 'Monthly' },
+    { merchant: 'Student Loan', amount: 350, dueDate: '25th', category: 'Loans', status: 'upcoming', nextDate: 'Apr 25', daysUntil: 14, emoji: '🎓', frequency: 'Monthly' },
   ],
   creditCards: [
-    { merchant: 'Chase Sapphire', amount: 1250, dueDate: '15th', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '💳' },
-    { merchant: 'Amex Gold', amount: 680, dueDate: '22nd', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 22', daysUntil: 11, emoji: '💳' },
+    { merchant: 'Chase Sapphire', amount: 1250, dueDate: '15th', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '💳', frequency: 'Monthly' },
+    { merchant: 'Amex Gold', amount: 680, dueDate: '22nd', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 22', daysUntil: 11, emoji: '💳', frequency: 'Monthly' },
   ],
 };
 

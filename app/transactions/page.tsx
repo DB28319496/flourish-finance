@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 import { Card, PillToggle, Dropdown, Badge } from "@/components/ui";
 import {
-  transactionGroups,
   formatCurrency,
-  Transaction,
-  TransactionDateGroup,
+  type Transaction,
+  type TransactionDateGroup,
 } from "@/lib/mock-data";
+import { useData } from "@/lib/data-context";
 import { cn, getMerchantColor, getAccountColor, formatDate } from "@/lib/utils";
 
 // =============================================================================
@@ -32,6 +32,8 @@ type FilterTab = "All" | "Receipts";
 // =============================================================================
 
 export default function TransactionsPage() {
+  const { transactionGroups } = useData();
+
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [transactionFilter, setTransactionFilter] = useState("All transactions");
@@ -46,7 +48,7 @@ export default function TransactionsPage() {
       ...group,
       total: group.transactions.reduce((sum, t) => sum + t.amount, 0),
     }));
-  }, []);
+  }, [transactionGroups]);
 
   // Get total of all transactions
   const grandTotal = useMemo(
@@ -78,7 +80,7 @@ export default function TransactionsPage() {
         <PillToggle
           options={["All", "Receipts"]}
           value={filterTab}
-          onChange={(v) => setFilterTab(v as FilterTab)}
+          onChange={(v: string) => setFilterTab(v as FilterTab)}
           size="sm"
         />
       </div>

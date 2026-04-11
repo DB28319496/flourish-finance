@@ -23,14 +23,12 @@ import {
   ProgressBar,
 } from "@/components/ui";
 import {
-  accountGroups,
   formatCurrency,
-  getNetWorth,
-  getAssetsTotal,
-  getLiabilitiesTotal,
   generateNetWorthTimeline,
 } from "@/lib/mock-data";
+import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
+import { PlaidLinkButton } from "@/components/plaid-link-button";
 
 // Utility to get icon component by name
 function getIconComponent(
@@ -64,13 +62,19 @@ function formatLastSynced(timeStr: string): string {
 }
 
 export default function AccountsPage() {
+  const { accountGroups, isLoading, isUsingMockData } = useData();
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["cash", "invest", "credit"])
+    new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
   );
 
-  const netWorth = getNetWorth();
-  const assets = getAssetsTotal();
-  const liabilities = getLiabilitiesTotal();
+  const assets = accountGroups
+    .filter((g) => g.type !== "creditCards" && g.type !== "loans")
+    .reduce((sum, g) => sum + g.accounts.reduce((s, a) => s + a.balance, 0), 0);
+  const liabilities = accountGroups
+    .filter((g) => g.type === "creditCards" || g.type === "loans")
+    .reduce((sum, g) => sum + g.accounts.reduce((s, a) => s + a.balance, 0), 0);
+  const netWorth = assets - liabilities;
   const netWorthTimeline = generateNetWorthTimeline();
 
   const toggleGroup = (groupId: string) => {
@@ -94,9 +98,10 @@ export default function AccountsPage() {
             Accounts
           </h1>
           <p className="mt-1 text-flourish-secondary">
-            Manage all your connected accounts
+            {isUsingMockData ? "Viewing demo data — sign in to connect your banks" : "Manage all your connected accounts"}
           </p>
         </div>
+        <PlaidLinkButton />
       </div>
 
       {/* Net Worth Header Card */}
@@ -115,11 +120,11 @@ export default function AccountsPage() {
           </div>
 
           {/* Net Worth Area Chart */}
-          <div className="h-48">
+          <div className="h-48 -mx-6">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={netWorthTimeline}
-                margin={{ top: 12, right: 12, left: 8, bottom: 0 }}
+                margin={{ top: 12, right: 24, left: -20, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
