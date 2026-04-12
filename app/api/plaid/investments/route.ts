@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
+import { verifyIdToken } from "@/lib/firebase-admin";
 import { getPlaidClient } from "@/lib/plaid-server";
+import { getPlaidTokensForUser } from "@/lib/household-helpers";
 
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const itemsSnapshot = await adminDb
-      .collection("plaid_access_tokens")
-      .where("user_id", "==", uid)
-      .where("is_active", "==", true)
-      .get();
+    const tokens = await getPlaidTokensForUser(uid);
 
-    if (itemsSnapshot.empty) {
+    if (tokens.length === 0) {
       return NextResponse.json({ holdingGroups: [] });
     }
 
     const plaid = getPlaidClient();
     const holdingGroups: any[] = [];
 
-    for (const doc of itemsSnapshot.docs) {
-      const tokenData = doc.data();
+    for (const token of tokens) {
       try {
         const response = await plaid.investmentsHoldingsGet({
-          access_token: tokenData.access_token,
+          access_token: token.access_token,
         });
 
         const { holdings, securities, accounts } = response.data;
@@ -78,7 +74,7 @@ export async function POST(req: NextRequest) {
         if (err?.response?.data?.error_code === "PRODUCTS_NOT_SUPPORTED") {
           continue;
         }
-        console.error(`Error fetching investments for item ${doc.id}:`, err.message);
+        console.error(`Error fetching investments for item ${token.id}:`, err.message);
       }
     }
 

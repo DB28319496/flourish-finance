@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
+import { verifyIdToken } from "@/lib/firebase-admin";
 import { getPlaidClient, CountryCode } from "@/lib/plaid-server";
+import { getPlaidTokensForUser } from "@/lib/household-helpers";
 
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    // Get all Plaid items for this user
-    const itemsSnapshot = await adminDb
-      .collection("plaid_access_tokens")
-      .where("user_id", "==", uid)
-      .where("is_active", "==", true)
-      .get();
+    const tokens = await getPlaidTokensForUser(uid);
 
-    if (itemsSnapshot.empty) {
+    if (tokens.length === 0) {
       return NextResponse.json({ accounts: [], items: [] });
     }
 
@@ -22,11 +18,10 @@ export async function POST(req: NextRequest) {
     const allAccounts: any[] = [];
     const items: any[] = [];
 
-    for (const doc of itemsSnapshot.docs) {
-      const tokenData = doc.data();
+    for (const token of tokens) {
       try {
         const accountsResponse = await plaid.accountsGet({
-          access_token: tokenData.access_token,
+          access_token: token.access_token,
         });
 
         const institutionId = accountsResponse.data.item.institution_id;
@@ -46,7 +41,7 @@ export async function POST(req: NextRequest) {
 
         const accounts = accountsResponse.data.accounts.map((account) => ({
           account_id: account.account_id,
-          item_id: doc.id,
+          item_id: token.id,
           name: account.name,
           official_name: account.official_name,
           type: account.type,
@@ -61,12 +56,12 @@ export async function POST(req: NextRequest) {
 
         allAccounts.push(...accounts);
         items.push({
-          item_id: doc.id,
+          item_id: token.id,
           institution_name: institutionName,
           account_count: accounts.length,
         });
       } catch (err: any) {
-        console.error(`Error fetching accounts for item ${doc.id}:`, err.message);
+        console.error(`Error fetching accounts for item ${token.id}:`, err.message);
       }
     }
 

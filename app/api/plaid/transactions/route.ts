@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
+import { verifyIdToken } from "@/lib/firebase-admin";
 import { getPlaidClient, CountryCode } from "@/lib/plaid-server";
+import { getPlaidTokensForUser } from "@/lib/household-helpers";
 
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
@@ -9,13 +10,9 @@ export async function POST(req: NextRequest) {
   const { days = 30 } = await req.json().catch(() => ({ days: 30 }));
 
   try {
-    const itemsSnapshot = await adminDb
-      .collection("plaid_access_tokens")
-      .where("user_id", "==", uid)
-      .where("is_active", "==", true)
-      .get();
+    const tokens = await getPlaidTokensForUser(uid);
 
-    if (itemsSnapshot.empty) {
+    if (tokens.length === 0) {
       return NextResponse.json({ transactions: [], total_transactions: 0 });
     }
 
@@ -24,12 +21,11 @@ export async function POST(req: NextRequest) {
     const endDate = new Date().toISOString().split("T")[0];
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    for (const doc of itemsSnapshot.docs) {
-      const tokenData = doc.data();
+    for (const token of tokens) {
       try {
         // Get accounts for mapping
         const accountsResponse = await plaid.accountsGet({
-          access_token: tokenData.access_token,
+          access_token: token.access_token,
         });
 
         const institutionId = accountsResponse.data.item.institution_id;
@@ -52,7 +48,7 @@ export async function POST(req: NextRequest) {
 
         // Get transactions
         const transactionsResponse = await plaid.transactionsGet({
-          access_token: tokenData.access_token,
+          access_token: token.access_token,
           start_date: startDate,
           end_date: endDate,
           options: { count: 500, offset: 0 },
@@ -79,7 +75,7 @@ export async function POST(req: NextRequest) {
 
         allTransactions.push(...transactions);
       } catch (err: any) {
-        console.error(`Error fetching transactions for item ${doc.id}:`, err.message);
+        console.error(`Error fetching transactions for item ${token.id}:`, err.message);
       }
     }
 
