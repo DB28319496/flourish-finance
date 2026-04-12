@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, TrendingUp, TrendingDown, AlertTriangle, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
 import { Card, PillToggle, Badge, Dropdown } from '@/components/ui';
+import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { useData } from '@/lib/data-context';
 import { formatCurrency, formatPercent } from '@/lib/mock-data';
 import { cn, getMerchantColor } from '@/lib/utils';
@@ -17,7 +18,7 @@ const SECTOR_COLORS = [
 ];
 
 export default function InvestmentsPage() {
-  const { holdingGroups, benchmarks, isUsingMockData, accountGroups, connectBank } = useData();
+  const { holdingGroups, benchmarks, isUsingMockData, accountGroups } = useData();
 
   // Detect investment accounts that exist but have no holdings data
   const investmentAccountsCount = accountGroups
@@ -156,12 +157,7 @@ export default function InvestmentsPage() {
                 <p className="font-body text-sm text-flourish-muted mb-4">
                   We can see your {investmentAccountsCount} investment {investmentAccountsCount === 1 ? 'account' : 'accounts'} and their balances, but detailed holdings data (individual stocks, ETFs, cost basis) requires reconnecting. Your iOS app connected these with only the Transactions product — reconnecting through the web adds Investments support.
                 </p>
-                <button
-                  onClick={() => connectBank()}
-                  className="px-4 py-2 bg-flourish-orange text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Reconnect investment accounts
-                </button>
+                <PlaidLinkButton className="inline-flex items-center gap-2 px-4 py-2 bg-flourish-orange text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50" />
               </div>
             </div>
           </Card>
