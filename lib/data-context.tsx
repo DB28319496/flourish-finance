@@ -397,11 +397,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [isUsingMockData, rawTransactions]
   );
 
-  // -- Recurring
-  const recurringTransactions = useMemo(
-    () => (isUsingMockData ? mockRecurringData as any : detectRecurringTransactions(rawTransactions)),
-    [isUsingMockData, rawTransactions]
-  );
+  // -- Recurring (filter out user-excluded merchants)
+  const recurringTransactions = useMemo(() => {
+    if (isUsingMockData) return mockRecurringData as any;
+    const detected = detectRecurringTransactions(rawTransactions);
+    const excluded = new Set((userSettings.excludedRecurring || []).map((m) => m.toLowerCase()));
+    if (excluded.size === 0) return detected;
+    const filter = (items: any[]) => items.filter((i) => !excluded.has(i.merchant.toLowerCase()));
+    return {
+      income: filter(detected.income),
+      expenses: filter(detected.expenses),
+      creditCards: filter(detected.creditCards),
+    };
+  }, [isUsingMockData, rawTransactions, userSettings.excludedRecurring]);
 
   // -- Budget
   const budgetSections = useMemo(

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
@@ -53,6 +53,29 @@ export function Sidebar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
+
+  // Allow other pages to open the AI chat via custom event
+  useEffect(() => {
+    const openHandler = () => setAiChatOpen(true);
+    window.addEventListener('flourish:open-ai-chat', openHandler);
+    window.addEventListener('flourish:ask-ai', openHandler);
+    return () => {
+      window.removeEventListener('flourish:open-ai-chat', openHandler);
+      window.removeEventListener('flourish:ask-ai', openHandler);
+    };
+  }, []);
+
+  // Keyboard shortcut: Cmd+K / Ctrl+K opens search
+  useEffect(() => {
+    const keyHandler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+    return () => window.removeEventListener('keydown', keyHandler);
+  }, []);
 
   return (
     <>
@@ -186,15 +209,10 @@ export function Sidebar({
         <div className={`pb-5 space-y-4 ${collapsed ? 'px-3' : 'px-5'}`}>
           {!collapsed ? (
             <>
-              {/* Free Trial */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-flourish-dark">Free trial</span>
-                  <span className="text-sm text-flourish-secondary">7 days left</span>
-                </div>
-                <div className="h-1.5 bg-[#e8ddd4] rounded-full overflow-hidden">
-                  <div className="h-full w-[70%] bg-emerald-500 rounded-full" />
-                </div>
+              {/* Beta badge */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-xl">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-semibold text-emerald-700">Free during beta</span>
               </div>
 
               {/* AI Assistant */}

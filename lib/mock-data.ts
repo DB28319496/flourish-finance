@@ -137,6 +137,7 @@ export interface UserSettings {
   accentColor?: string;
   displayName?: string;
   currency?: string;
+  excludedRecurring?: string[]; // merchant names the user has marked as not recurring
 }
 
 export interface TransactionEdit {

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   Sparkles, TrendingUp, Shield, PiggyBank, CreditCard,
-  ChevronRight, ThumbsDown, AlertTriangle,
+  ChevronRight, ThumbsDown, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 import { Card, Badge } from '@/components/ui';
 import { useData } from '@/lib/data-context';
@@ -139,9 +139,19 @@ export default function AdvicePage() {
                         >
                           <ThumbsDown className="w-4 h-4" />
                         </button>
-                        <button className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-flourish-orange hover:bg-orange-50 rounded-lg transition-colors">
-                          View Details
-                          <ChevronRight className="w-4 h-4" />
+                        <button
+                          onClick={() => {
+                            // Dispatch event for sidebar's AI chat panel to pick up
+                            window.dispatchEvent(
+                              new CustomEvent('flourish:ask-ai', {
+                                detail: { prompt: `Tell me more about this insight and what I should do: "${insight.title}"` }
+                              })
+                            );
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-flourish-orange hover:bg-orange-50 rounded-lg transition-colors"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Ask AI
                         </button>
                       </div>
                     </div>

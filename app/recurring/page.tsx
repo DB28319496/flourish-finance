@@ -1,12 +1,61 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, ExternalLink } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, MoreVertical, ExternalLink, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card, PillToggle, ProgressBar, Badge } from '@/components/ui';
 import { formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
 import { useData } from '@/lib/data-context';
 import { cn, getMerchantColor } from '@/lib/utils';
+
+// Dropdown menu for each recurring item
+function ItemMenu({ merchant, onView, onExclude }: { merchant: string; onView: () => void; onExclude: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
+      >
+        <MoreVertical className="w-4 h-4 text-flourish-muted" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 min-w-[200px] bg-white rounded-xl shadow-flourish-hover border border-flourish-border py-1">
+          <button
+            onClick={() => { onView(); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-flourish-dark hover:bg-flourish-hover transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 text-flourish-secondary" />
+            View transactions
+          </button>
+          <button
+            onClick={() => {
+              if (confirm(`Stop treating "${merchant}" as recurring?\n\nThis hides it from the Recurring page. It will still appear in Transactions.`)) {
+                onExclude();
+                setOpen(false);
+              }
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Not recurring — hide
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type RecurringFilter = 'monthly' | 'all';
 type TableSection = 'income' | 'expenses' | 'creditCards';
@@ -53,11 +102,18 @@ export default function RecurringPage() {
     }));
   };
 
-  const { recurringTransactions } = useData();
+  const { recurringTransactions, userSettings, updateUserSetting } = useData();
   const router = useRouter();
 
   const viewTransactions = (merchant: string) => {
     router.push(`/transactions?merchant=${encodeURIComponent(merchant)}`);
+  };
+
+  const excludeFromRecurring = (merchant: string) => {
+    const current = userSettings.excludedRecurring || [];
+    if (!current.some((m) => m.toLowerCase() === merchant.toLowerCase())) {
+      updateUserSetting('excludedRecurring', [...current, merchant]);
+    }
   };
   const incomeItems = recurringTransactions.income;
   const expenseItems = recurringTransactions.expenses;
@@ -189,13 +245,11 @@ export default function RecurringPage() {
                           {item.nextDate}
                         </p>
                       </div>
-                      <button
-                        onClick={() => viewTransactions(item.merchant)}
-                        title="View transactions from this merchant"
-                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
-                      </button>
+                      <ItemMenu
+                        merchant={item.merchant}
+                        onView={() => viewTransactions(item.merchant)}
+                        onExclude={() => excludeFromRecurring(item.merchant)}
+                      />
                     </div>
                   </div>
                 ))}
@@ -296,13 +350,11 @@ export default function RecurringPage() {
                           {item.daysUntil} days
                         </p>
                       </div>
-                      <button
-                        onClick={() => viewTransactions(item.merchant)}
-                        title="View transactions from this merchant"
-                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
-                      </button>
+                      <ItemMenu
+                        merchant={item.merchant}
+                        onView={() => viewTransactions(item.merchant)}
+                        onExclude={() => excludeFromRecurring(item.merchant)}
+                      />
                     </div>
                   </div>
                 ))}
@@ -351,13 +403,11 @@ export default function RecurringPage() {
                           {item.daysUntil} days
                         </p>
                       </div>
-                      <button
-                        onClick={() => viewTransactions(item.merchant)}
-                        title="View transactions from this merchant"
-                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
-                      </button>
+                      <ItemMenu
+                        merchant={item.merchant}
+                        onView={() => viewTransactions(item.merchant)}
+                        onExclude={() => excludeFromRecurring(item.merchant)}
+                      />
                     </div>
                   </div>
                 ))}
@@ -408,13 +458,11 @@ export default function RecurringPage() {
                           3 days ago
                         </p>
                       </div>
-                      <button
-                        onClick={() => viewTransactions(item.merchant)}
-                        title="View transactions from this merchant"
-                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
-                      </button>
+                      <ItemMenu
+                        merchant={item.merchant}
+                        onView={() => viewTransactions(item.merchant)}
+                        onExclude={() => excludeFromRecurring(item.merchant)}
+                      />
                     </div>
                   </div>
                 ))}

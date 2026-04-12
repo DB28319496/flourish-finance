@@ -46,17 +46,72 @@ export default function TransactionsPage() {
   }, []);
   const [transactionFilter, setTransactionFilter] = useState("All transactions");
   const [sortBy, setSortBy] = useState("Newest");
-  const [gridView, setGridView] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
-  // Calculate daily totals
+  // Apply search + filter + sort to transaction groups
   const groupsWithTotals = useMemo(() => {
-    return transactionGroups.map((group) => ({
-      ...group,
-      total: group.transactions.reduce((sum, t) => sum + t.amount, 0),
-    }));
-  }, [transactionGroups]);
+    const q = searchQuery.trim().toLowerCase();
+
+    // Filter transactions per group
+    const filtered = transactionGroups.map((group) => {
+      let txs = group.transactions;
+
+      // Text search on merchant, statement, category, notes
+      if (q) {
+        txs = txs.filter((t) => {
+          return (
+            t.merchantName?.toLowerCase().includes(q) ||
+            t.originalStatement?.toLowerCase().includes(q) ||
+            t.category.name?.toLowerCase().includes(q) ||
+            t.category.group?.toLowerCase().includes(q) ||
+            t.notes?.toLowerCase().includes(q) ||
+            t.accountName?.toLowerCase().includes(q)
+          );
+        });
+      }
+
+      // Filter dropdown
+      const groupDate = new Date(group.date + "T00:00:00");
+      const now = new Date();
+      const daysAgo = Math.floor((now.getTime() - groupDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (transactionFilter === "Flagged") {
+        txs = txs.filter((t) => t.isFlagged);
+      } else if (transactionFilter === "Recurring") {
+        txs = txs.filter((t) => t.isRecurring);
+      } else if (transactionFilter === "Pending") {
+        txs = txs.filter((t) => t.isPending);
+      } else if (transactionFilter === "Last 7 days" && daysAgo > 7) {
+        txs = [];
+      } else if (transactionFilter === "Last 30 days" && daysAgo > 30) {
+        txs = [];
+      }
+
+      // Receipts filter (tab)
+      if (filterTab === "Receipts") {
+        txs = txs.filter((t) => (t.notes || "").toLowerCase().includes("receipt"));
+      }
+
+      return {
+        ...group,
+        transactions: txs,
+        total: txs.reduce((sum, t) => sum + t.amount, 0),
+      };
+    }).filter((g) => g.transactions.length > 0); // drop empty groups
+
+    // Sorting affects the group order
+    if (sortBy === "Oldest") {
+      filtered.reverse();
+    } else if (sortBy === "Highest Amount") {
+      filtered.sort((a, b) => b.total - a.total);
+    } else if (sortBy === "Lowest Amount") {
+      filtered.sort((a, b) => a.total - b.total);
+    }
+    // default "Newest" — already sorted by date desc from DataContext
+
+    return filtered;
+  }, [transactionGroups, searchQuery, transactionFilter, sortBy, filterTab]);
 
   // Get total of all transactions
   const grandTotal = useMemo(
@@ -116,21 +171,15 @@ export default function TransactionsPage() {
           />
         </div>
 
-        {/* Calendar */}
-        <button className="rounded-lg bg-flourish-bg p-2 text-flourish-secondary transition-colors hover:bg-flourish-tertiary/20 hover:text-flourish-text">
-          <Calendar className="h-5 w-5" />
-        </button>
-
-        {/* Filter */}
-        <button className="rounded-lg bg-flourish-bg p-2 text-flourish-secondary transition-colors hover:bg-flourish-tertiary/20 hover:text-flourish-text">
-          <SlidersHorizontal className="h-5 w-5" />
-        </button>
-
-        {/* Add Transaction */}
-        <button className="flex items-center gap-2 rounded-lg bg-flourish-orange px-4 py-2 text-sm font-medium text-white transition-all hover:shadow-flourish-hover">
-          <Plus className="h-4 w-4" />
-          Add Transaction
-        </button>
+        {/* Clear search */}
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="rounded-lg bg-flourish-bg px-3 py-2 text-sm text-flourish-secondary transition-colors hover:bg-flourish-tertiary/20 hover:text-flourish-text"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -148,30 +197,34 @@ export default function TransactionsPage() {
           onChange={setTransactionFilter}
         />
 
-        <button className="text-sm font-medium text-flourish-orange hover:underline">
-          Edit
-        </button>
-
         <Dropdown
           options={["Newest", "Oldest", "Highest Amount", "Lowest Amount"]}
           value={sortBy}
           onChange={setSortBy}
         />
 
-        <button
-          onClick={() => setGridView(!gridView)}
-          className={cn(
-            "rounded-lg p-2 transition-colors",
-            gridView
-              ? "bg-flourish-orange text-white"
-              : "bg-flourish-bg text-flourish-secondary hover:bg-flourish-tertiary/20"
-          )}
-        >
-          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 13h2v8H3v-8zm4-8h2v16H7V5zm4-2h2v18h-2V3zm4 4h2v14h-2V7zm4-2h2v16h-2V5z" />
-          </svg>
-        </button>
       </div>
+
+      {/* Empty state */}
+      {groupsWithTotals.length === 0 && (
+        <Card className="p-12 text-center">
+          <p className="text-flourish-secondary">
+            {searchQuery
+              ? `No transactions match "${searchQuery}"`
+              : transactionFilter !== "All transactions"
+              ? `No transactions match the "${transactionFilter}" filter`
+              : "No transactions yet"}
+          </p>
+          {(searchQuery || transactionFilter !== "All transactions") && (
+            <button
+              onClick={() => { setSearchQuery(""); setTransactionFilter("All transactions"); }}
+              className="mt-3 text-sm font-medium text-flourish-orange hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </Card>
+      )}
 
       {/* Transaction Groups */}
       <div className="space-y-6">

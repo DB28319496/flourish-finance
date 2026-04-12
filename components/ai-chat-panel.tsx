@@ -38,6 +38,22 @@ export function AIChatPanel({
     }
   }, [open]);
 
+  // Listen for "Ask AI" events from other pages (e.g., Advice page)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ prompt: string }>;
+      const prompt = ce.detail?.prompt;
+      if (prompt) {
+        // open the panel first
+        window.dispatchEvent(new CustomEvent('flourish:open-ai-chat'));
+        setTimeout(() => handleSend(prompt), 200);
+      }
+    };
+    window.addEventListener('flourish:ask-ai', handler);
+    return () => window.removeEventListener('flourish:ask-ai', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);

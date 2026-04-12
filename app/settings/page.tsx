@@ -200,29 +200,33 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between py-3 border-b border-flourish-border">
                     <div>
                       <p className="text-sm font-medium text-flourish-dark">Password</p>
-                      <p className="text-xs text-flourish-secondary mt-0.5">Last changed 30 days ago</p>
+                      <p className="text-xs text-flourish-secondary mt-0.5">Send a password reset email to {user?.email || 'your email'}</p>
                     </div>
-                    <button className="px-4 py-2 text-sm font-medium text-flourish-orange border border-flourish-orange rounded-lg hover:bg-orange-50 transition-colors">
-                      Change
+                    <button
+                      disabled={!user?.email}
+                      onClick={async () => {
+                        if (!user?.email) return;
+                        try {
+                          const { sendPasswordResetEmail } = await import('firebase/auth');
+                          const { auth } = await import('@/lib/firebase');
+                          if (!auth) return;
+                          await sendPasswordResetEmail(auth, user.email);
+                          alert(`Password reset email sent to ${user.email}`);
+                        } catch (err: any) {
+                          alert(`Error: ${err.message || 'Could not send reset email'}`);
+                        }
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-flourish-orange border border-flourish-orange rounded-lg hover:bg-orange-50 transition-colors disabled:opacity-50"
+                    >
+                      Send Reset Email
                     </button>
                   </div>
-                  <div className="flex items-center justify-between py-3 border-b border-flourish-border">
-                    <div>
-                      <p className="text-sm font-medium text-flourish-dark">Two-Factor Authentication</p>
-                      <p className="text-xs text-flourish-secondary mt-0.5">Add an extra layer of security</p>
-                    </div>
-                    <button className="px-4 py-2 text-sm font-medium text-white bg-flourish-orange rounded-lg hover:bg-orange-600 transition-colors">
-                      Enable
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="text-sm font-medium text-flourish-dark">Active Sessions</p>
-                      <p className="text-xs text-flourish-secondary mt-0.5">1 active session</p>
-                    </div>
-                    <button className="px-4 py-2 text-sm font-medium text-red-500 border border-red-300 rounded-lg hover:bg-red-50 transition-colors">
-                      Revoke All
-                    </button>
+                  <div className="py-3">
+                    <p className="text-sm font-medium text-flourish-dark mb-1">Signed in as</p>
+                    <p className="text-xs text-flourish-secondary">
+                      {user?.email || 'Not signed in'}
+                      {user?.emailVerified && <span className="ml-2 text-emerald-600 font-medium">✓ Verified</span>}
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -240,13 +244,14 @@ export default function SettingsPage() {
                     <Toggle enabled={darkMode} onChange={() => updateUserSetting('darkMode', !darkMode)} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-flourish-dark mb-3">Accent Color</p>
-                    <div className="flex gap-3">
+                    <p className="text-sm font-medium text-flourish-dark mb-1">Accent Color</p>
+                    <p className="text-xs text-flourish-secondary mb-3">Coming soon — currently fixed to Flourish orange</p>
+                    <div className="flex gap-3 opacity-60 pointer-events-none">
                       {['#E5633A', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444'].map((color) => (
-                        <button
+                        <div
                           key={color}
                           className={cn(
-                            'w-10 h-10 rounded-full border-2 transition-transform hover:scale-110',
+                            'w-10 h-10 rounded-full border-2',
                             color === '#E5633A' ? 'border-flourish-dark scale-110' : 'border-transparent'
                           )}
                           style={{ backgroundColor: color }}
@@ -262,20 +267,25 @@ export default function SettingsPage() {
               <Card className="p-8 animate-slide-up">
                 <h2 className="font-display text-xl font-bold text-flourish-text mb-6">Billing</h2>
                 <div className="space-y-6">
-                  <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-semibold text-flourish-dark">Free Trial</p>
-                      <span className="text-xs font-medium text-flourish-orange bg-white px-2 py-1 rounded-full">7 days left</span>
+                      <p className="text-sm font-semibold text-flourish-dark">Current Plan</p>
+                      <span className="text-xs font-medium text-emerald-700 bg-white px-2 py-1 rounded-full">Free — Beta</span>
                     </div>
-                    <p className="text-xs text-flourish-secondary">Your trial ends on April 18, 2026. Upgrade to keep full access.</p>
-                    <button className="mt-3 px-4 py-2 text-sm font-medium text-white bg-flourish-orange rounded-lg hover:bg-orange-600 transition-colors">
-                      Upgrade to Pro — $9.99/mo
-                    </button>
+                    <p className="text-xs text-flourish-secondary">
+                      Flourish is currently free during our beta. Subscription options will be available later.
+                    </p>
                   </div>
 
-                  <div className="py-3 border-b border-flourish-border">
-                    <p className="text-sm font-medium text-flourish-dark">Payment Method</p>
-                    <p className="text-xs text-flourish-secondary mt-0.5">No payment method on file</p>
+                  <div className="py-3">
+                    <p className="text-sm font-medium text-flourish-dark mb-1">What's included</p>
+                    <ul className="text-sm text-flourish-secondary space-y-1 mt-2">
+                      <li>✓ Unlimited bank connections via Plaid</li>
+                      <li>✓ Full transaction history and categorization</li>
+                      <li>✓ AI-powered financial insights</li>
+                      <li>✓ Sync across iOS and web</li>
+                      <li>✓ Household sharing</li>
+                    </ul>
                   </div>
                 </div>
               </Card>
