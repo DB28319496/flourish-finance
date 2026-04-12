@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, PillToggle, ProgressBar, SectionHeader } from "@/components/ui";
+import { Card, ProgressBar, SectionHeader } from "@/components/ui";
 import { formatCurrency } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Settings,
 } from "lucide-react";
+import Link from "next/link";
 
 // =============================================================================
 // Budget Page
@@ -19,7 +20,6 @@ import {
 
 export default function BudgetPage() {
   const [month, setMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"month" | "year" | "decade">("month");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["income", "fixed", "flex", "nonmo"])
   );
@@ -287,9 +287,13 @@ export default function BudgetPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-semibold text-flourish-text">Budget</h1>
-          <button className="p-2 hover:bg-flourish-bg rounded-flourish transition-colors">
+          <Link
+            href="/settings"
+            title="Settings"
+            className="p-2 hover:bg-flourish-bg rounded-flourish transition-colors"
+          >
             <Settings size={20} className="text-flourish-secondary" />
-          </button>
+          </Link>
         </div>
 
         {/* Navigation controls */}
@@ -319,24 +323,6 @@ export default function BudgetPage() {
             >
               Today
             </button>
-            <PillToggle
-              options={["Month", "Year", "Decade"]}
-              value={
-                viewMode === "month"
-                  ? "Month"
-                  : viewMode === "year"
-                    ? "Year"
-                    : "Decade"
-              }
-              onChange={(v) => {
-                const mode = v.toLowerCase() as
-                  | "month"
-                  | "year"
-                  | "decade";
-                setViewMode(mode);
-              }}
-              size="sm"
-            />
           </div>
         </div>
       </div>

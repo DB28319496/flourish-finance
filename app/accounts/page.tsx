@@ -22,6 +22,7 @@ import {
   Sparkline,
   ProgressBar,
 } from "@/components/ui";
+import { AccountDetailDrawer } from "@/components/account-detail-drawer";
 import {
   formatCurrency,
 } from "@/lib/mock-data";
@@ -63,6 +64,7 @@ function formatLastSynced(timeStr: string): string {
 export default function AccountsPage() {
   const { accountGroups, netWorthTimeline, isLoading, isUsingMockData } = useData();
 
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
   );
@@ -233,7 +235,12 @@ export default function AccountsPage() {
                         : 0;
 
                     return (
-                      <Card key={account.id} className="p-4">
+                      <Card
+                        key={account.id}
+                        hover
+                        className="p-4 cursor-pointer"
+                        onClick={() => setSelectedAccountId(account.id)}
+                      >
                         <div className="flex items-center gap-3">
                           {/* Account Initial Circle */}
                           <div
@@ -405,6 +412,13 @@ export default function AccountsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Account Detail Drawer */}
+      <AccountDetailDrawer
+        accountId={selectedAccountId}
+        accountName=""
+        onClose={() => setSelectedAccountId(null)}
+      />
     </div>
   );
 }

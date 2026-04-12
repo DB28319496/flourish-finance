@@ -37,12 +37,14 @@ export default function TransactionsPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Pre-fill search from URL query param (e.g., /transactions?merchant=Netflix)
+  // Pre-fill search from URL query param (e.g., /transactions?merchant=Netflix&account=Chase)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const merchant = params.get("merchant");
+    const account = params.get("account");
     if (merchant) setSearchQuery(merchant);
+    else if (account) setSearchQuery(account);
   }, []);
   const [transactionFilter, setTransactionFilter] = useState("All transactions");
   const [sortBy, setSortBy] = useState("Newest");

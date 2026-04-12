@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Calendar, Settings, Save, BarChart3 } from 'lucide-react';
 import { Card, PillToggle, SectionHeader, ProgressBar, Badge, Dropdown } from '@/components/ui';
@@ -17,14 +17,57 @@ type ReportTab = 'cash-flow' | 'spending' | 'income';
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('cash-flow');
   const [grouping, setGrouping] = useState('monthly');
+  const [dateRange, setDateRange] = useState('Last 6 Months');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
-  const { monthlyData, flatTransactions, transactionStats } = useData();
+  const { monthlyData, flatTransactions, transactionStats, rawTransactions } = useData();
 
-  // Compute summary from real data
-  const totalIncome = monthlyData.reduce((s, m) => s + m.income, 0);
-  const totalExpensesVal = monthlyData.reduce((s, m) => s + m.expenses, 0);
+  // Apply date range filter to monthlyData
+  const filteredMonthly = useMemo(() => {
+    if (dateRange === 'All Time') return monthlyData;
+    const months = dateRange === 'Last 3 Months' ? 3 : dateRange === 'Last 6 Months' ? 6 : dateRange === 'Last 12 Months' ? 12 : dateRange === 'YTD' ? new Date().getMonth() + 1 : 6;
+    return monthlyData.slice(-months);
+  }, [monthlyData, dateRange]);
+
+  // Apply filters to flatTransactions
+  const filteredFlat = useMemo(() => {
+    let result = flatTransactions;
+    const min = parseFloat(minAmount);
+    const max = parseFloat(maxAmount);
+    if (!isNaN(min)) result = result.filter((t) => Math.abs(t.amount) >= min);
+    if (!isNaN(max)) result = result.filter((t) => Math.abs(t.amount) <= max);
+    if (categoryFilter.trim()) {
+      const q = categoryFilter.trim().toLowerCase();
+      result = result.filter((t) => t.category.toLowerCase().includes(q));
+    }
+    return result;
+  }, [flatTransactions, minAmount, maxAmount, categoryFilter]);
+
+  // Compute summary from filtered data
+  const totalIncome = filteredMonthly.reduce((s, m) => s + m.income, 0);
+  const totalExpensesVal = filteredMonthly.reduce((s, m) => s + m.expenses, 0);
   const netIncome = totalIncome - totalExpensesVal;
   const savingsRateVal = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
+
+  const handleExportCSV = () => {
+    const header = 'Date,Merchant,Category,Amount\n';
+    const rows = rawTransactions.map((t) =>
+      [t.date, `"${(t.merchant_name || t.name).replace(/"/g, '""')}"`, `"${(t.category?.[0] || 'Other').replace(/"/g, '""')}"`, (t.amount > 0 ? -t.amount : Math.abs(t.amount))].join(',')
+    ).join('\n');
+    const csv = header + rows;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `flourish-report-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const summaryCards = [
     {
@@ -130,7 +173,7 @@ export default function ReportsPage() {
           {/* Chart */}
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
-              data={monthlyData}
+              data={filteredMonthly}
               margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -151,20 +194,84 @@ export default function ReportsPage() {
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          <button className="flex items-center gap-2 px-4 py-2 border border-flourish-border rounded-flourish-lg hover:bg-flourish-hover transition-colors font-body text-sm">
-            <Calendar className="w-4 h-4" />
-            Date Range
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-flourish-border rounded-flourish-lg hover:bg-flourish-hover transition-colors font-body text-sm">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <Dropdown
+            value={dateRange}
+            onChange={setDateRange}
+            options={[
+              { value: 'Last 3 Months', label: 'Last 3 Months' },
+              { value: 'Last 6 Months', label: 'Last 6 Months' },
+              { value: 'Last 12 Months', label: 'Last 12 Months' },
+              { value: 'YTD', label: 'Year to Date' },
+              { value: 'All Time', label: 'All Time' },
+            ]}
+          />
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 border rounded-flourish-lg transition-colors font-body text-sm',
+              filtersOpen
+                ? 'bg-flourish-orange text-white border-flourish-orange'
+                : 'border-flourish-border hover:bg-flourish-hover'
+            )}
+          >
             <Settings className="w-4 h-4" />
             Filters
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-flourish-orange text-white rounded-flourish-lg hover:bg-orange-600 transition-colors font-body text-sm font-medium ml-auto">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 bg-flourish-orange text-white rounded-flourish-lg hover:bg-orange-600 transition-colors font-body text-sm font-medium ml-auto"
+          >
             <Save className="w-4 h-4" />
-            Save Report
+            Export CSV
           </button>
         </div>
+
+        {/* Filters Panel */}
+        {filtersOpen && (
+          <Card className="p-4 mb-6 animate-slide-up">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-flourish-muted mb-1">Min Amount</label>
+                <input
+                  type="number"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-flourish-border rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-flourish-muted mb-1">Max Amount</label>
+                <input
+                  type="number"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  placeholder="no max"
+                  className="w-full px-3 py-2 border border-flourish-border rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-flourish-muted mb-1">Category contains</label>
+                <input
+                  type="text"
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  placeholder="e.g. food"
+                  className="w-full px-3 py-2 border border-flourish-border rounded-lg text-sm"
+                />
+              </div>
+            </div>
+            {(minAmount || maxAmount || categoryFilter) && (
+              <button
+                onClick={() => { setMinAmount(''); setMaxAmount(''); setCategoryFilter(''); }}
+                className="mt-3 text-xs font-medium text-flourish-orange hover:underline"
+              >
+                Clear all filters
+              </button>
+            )}
+          </Card>
+        )}
 
         {/* Transaction Preview Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -175,7 +282,7 @@ export default function ReportsPage() {
                 Recent Transactions
               </h3>
               <div className="space-y-3">
-                {flatTransactions.slice(0, 8).map((txn, idx) => (
+                {filteredFlat.slice(0, 8).map((txn, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-3 hover:bg-flourish-hover rounded-lg transition-colors border-b border-flourish-border last:border-b-0"

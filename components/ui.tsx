@@ -12,15 +12,18 @@ export function Card({
   className,
   hover = false,
   style,
+  onClick,
 }: {
   children: React.ReactNode;
   className?: string;
   hover?: boolean;
   style?: React.CSSProperties;
+  onClick?: () => void;
 }) {
   return (
     <div
       style={style}
+      onClick={onClick}
       className={cn(
         "bg-flourish-card rounded-flourish-lg p-6 shadow-flourish",
         hover && "transition-shadow duration-200 hover:shadow-flourish-hover",

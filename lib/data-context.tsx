@@ -55,6 +55,7 @@ interface DataContextType {
   accounts: PlaidAccount[];
   accountGroups: AccountGroup[];
   transactionGroups: TransactionDateGroup[];
+  rawTransactions: PlaidTransaction[];
   linkedItems: { item_id: string; institution_name: string }[];
   brokenItems: { item_id: string; error_code: string; needs_reauth: boolean }[];
   isLoading: boolean;
@@ -735,7 +736,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
   return (
     <DataContext.Provider
       value={{
-        accounts, accountGroups, transactionGroups, linkedItems, brokenItems,
+        accounts, accountGroups, transactionGroups, rawTransactions, linkedItems, brokenItems,
         isLoading, isUsingMockData, error,
         refreshAccounts, refreshTransactions, connectBank, disconnectBank,
         sendChatMessage,

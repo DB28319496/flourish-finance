@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ComposedChart,
   Bar,
@@ -22,7 +22,7 @@ import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
 
 type TimePeriod = "Monthly" | "Quarterly" | "Yearly";
-type ViewType = "Bar Chart" | "Sankey Diagram";
+type ViewType = "Bar Chart" | "Flow Diagram";
 type BreakdownView = "Category" | "Group" | "Merchant";
 
 export default function CashFlowPage() {
@@ -32,7 +32,91 @@ export default function CashFlowPage() {
   const [incomeView, setIncomeView] = useState<BreakdownView>("Category");
   const [expenseView, setExpenseView] = useState<BreakdownView>("Category");
 
-  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown } = useData();
+  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown, rawTransactions } = useData();
+
+  // Build merchant/group breakdowns from raw transactions
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthTxs = useMemo(
+    () => rawTransactions.filter((t) => t.date.startsWith(currentMonthKey)),
+    [rawTransactions, currentMonthKey]
+  );
+
+  // Group (top-level Plaid category) breakdown
+  const expensesByGroup = useMemo(() => {
+    const byGroup: Record<string, number> = {};
+    for (const tx of currentMonthTxs) {
+      if (tx.amount <= 0) continue;
+      const g = tx.category?.[0] || "Other";
+      byGroup[g] = (byGroup[g] || 0) + tx.amount;
+    }
+    const total = Object.values(byGroup).reduce((s, v) => s + v, 0) || 1;
+    const colors = ["#E03131", "#E5633A", "#7C3AED", "#4D8FDB", "#2B8A3E", "#0891B2", "#D97706", "#BE185D"];
+    return Object.entries(byGroup)
+      .sort(([, a], [, b]) => b - a)
+      .map(([cat, amount], i) => ({
+        id: cat, category: cat, emoji: "📊", amount, percentage: (amount / total) * 100,
+        color: colors[i % colors.length],
+      }));
+  }, [currentMonthTxs]);
+
+  // Merchant breakdown
+  const expensesByMerchant = useMemo(() => {
+    const byMerchant: Record<string, number> = {};
+    for (const tx of currentMonthTxs) {
+      if (tx.amount <= 0) continue;
+      const m = tx.merchant_name || tx.name || "Unknown";
+      byMerchant[m] = (byMerchant[m] || 0) + tx.amount;
+    }
+    const total = Object.values(byMerchant).reduce((s, v) => s + v, 0) || 1;
+    const colors = ["#E03131", "#E5633A", "#7C3AED", "#4D8FDB", "#2B8A3E", "#0891B2", "#D97706", "#BE185D"];
+    return Object.entries(byMerchant)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([merchant, amount], i) => ({
+        id: merchant, category: merchant, emoji: "🛒", amount, percentage: (amount / total) * 100,
+        color: colors[i % colors.length],
+      }));
+  }, [currentMonthTxs]);
+
+  // Same for income by group/merchant
+  const incomeByGroup = useMemo(() => {
+    const byGroup: Record<string, number> = {};
+    for (const tx of currentMonthTxs) {
+      if (tx.amount >= 0) continue;
+      const g = tx.category?.[0] || "Income";
+      byGroup[g] = (byGroup[g] || 0) + Math.abs(tx.amount);
+    }
+    const total = Object.values(byGroup).reduce((s, v) => s + v, 0) || 1;
+    return Object.entries(byGroup)
+      .sort(([, a], [, b]) => b - a)
+      .map(([cat, amount], i) => ({
+        id: cat, category: cat, emoji: "💰", amount, percentage: (amount / total) * 100,
+        color: ["#2B8A3E", "#5C9E6B", "#0891B2"][i % 3],
+      }));
+  }, [currentMonthTxs]);
+
+  const incomeByMerchant = useMemo(() => {
+    const byMerchant: Record<string, number> = {};
+    for (const tx of currentMonthTxs) {
+      if (tx.amount >= 0) continue;
+      const m = tx.merchant_name || tx.name || "Unknown";
+      byMerchant[m] = (byMerchant[m] || 0) + Math.abs(tx.amount);
+    }
+    const total = Object.values(byMerchant).reduce((s, v) => s + v, 0) || 1;
+    return Object.entries(byMerchant)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([m, amount], i) => ({
+        id: m, category: m, emoji: "💵", amount, percentage: (amount / total) * 100,
+        color: ["#2B8A3E", "#5C9E6B", "#0891B2"][i % 3],
+      }));
+  }, [currentMonthTxs]);
+
+  // Pick the breakdown based on toggle
+  const displayedExpenses = expenseView === "Category" ? expenseBreakdown
+    : expenseView === "Group" ? expensesByGroup : expensesByMerchant;
+  const displayedIncomes = incomeView === "Category" ? incomeBreakdown
+    : incomeView === "Group" ? incomeByGroup : incomeByMerchant;
 
   // Calculate summary stats from cash flow data
   const totalIncome = cashFlowMonths.reduce((sum, m) => sum + m.income, 0);
@@ -47,8 +131,8 @@ export default function CashFlowPage() {
   }));
 
   // Sort expense breakdown by amount descending
-  const sortedExpenses = [...expenseBreakdown].sort((a, b) => b.amount - a.amount);
-  const sortedIncomes = [...incomeBreakdown].sort((a, b) => b.amount - a.amount);
+  const sortedExpenses = [...displayedExpenses].sort((a, b) => b.amount - a.amount);
+  const sortedIncomes = [...displayedIncomes].sort((a, b) => b.amount - a.amount);
 
   const summaryCards = [
     {
@@ -200,13 +284,85 @@ export default function CashFlowPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-flourish-text">Breakdown</h2>
         <PillToggle
-          options={["Bar Chart", "Sankey Diagram"]}
+          options={["Bar Chart", "Flow Diagram"]}
           value={viewType}
           onChange={(v) => setViewType(v as ViewType)}
           size="sm"
         />
       </div>
 
+      {/* Flow Diagram */}
+      {viewType === "Flow Diagram" && (
+        <Card className="animate-slide-up p-8">
+          <div className="space-y-6">
+            <p className="text-sm text-flourish-secondary">Where your money came from and where it went this month</p>
+
+            <div className="flex items-stretch gap-6">
+              {/* Income column */}
+              <div className="flex-1 space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-flourish-green mb-3">
+                  Income · {formatCurrency(totalIncome)}
+                </div>
+                {sortedIncomes.map((item) => (
+                  <div key={item.id} className="bg-emerald-50 p-3 rounded-xl border-l-4 border-flourish-green">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-flourish-text truncate">
+                        {item.emoji} {item.category}
+                      </span>
+                      <span className="text-sm font-bold text-flourish-green tabular-nums">
+                        +{formatCurrencyShort(item.amount)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Flow Arrow */}
+              <div className="flex flex-col items-center justify-center px-4">
+                <div className="w-12 h-12 rounded-full bg-flourish-orange/10 flex items-center justify-center mb-2">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-flourish-orange">
+                    <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-flourish-muted uppercase tracking-wider mb-1">Net</p>
+                  <p className={cn('font-display text-lg font-bold', totalSavings >= 0 ? 'text-flourish-green' : 'text-flourish-red')}>
+                    {totalSavings >= 0 ? '+' : ''}{formatCurrencyShort(totalSavings)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Expenses column */}
+              <div className="flex-1 space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-flourish-red mb-3">
+                  Expenses · {formatCurrency(totalExpenses)}
+                </div>
+                {sortedExpenses.slice(0, 8).map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl border-l-4"
+                    style={{
+                      backgroundColor: item.color + '15',
+                      borderLeftColor: item.color,
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-flourish-text truncate">
+                        {item.emoji} {item.category}
+                      </span>
+                      <span className="text-sm font-bold text-flourish-text tabular-nums">
+                        -{formatCurrencyShort(item.amount)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {viewType === "Bar Chart" && <>
       {/* Income Breakdown */}
       <Card className="animate-slide-up">
         <div className="space-y-4">
@@ -291,6 +447,7 @@ export default function CashFlowPage() {
           </div>
         </div>
       </Card>
+      </>}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -14,6 +15,7 @@ import { cn, getMerchantColor } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const {
     accounts,
     accountGroups,
@@ -112,7 +114,7 @@ export default function DashboardPage() {
 
       {/* Top KPI Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 animate-slide-up">
+        <Card hover className="p-5 animate-slide-up cursor-pointer" onClick={() => router.push('/accounts')}>
           <div className="flex items-center justify-between mb-2">
             <p className="font-body text-xs text-flourish-muted uppercase tracking-wider">Net Worth</p>
             <Wallet className="w-4 h-4 text-flourish-muted" />
@@ -130,7 +132,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-5 animate-slide-up stagger-1">
+        <Card hover className="p-5 animate-slide-up stagger-1 cursor-pointer" onClick={() => router.push('/accounts')}>
           <div className="flex items-center justify-between mb-2">
             <p className="font-body text-xs text-flourish-muted uppercase tracking-wider">Assets</p>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
@@ -141,7 +143,7 @@ export default function DashboardPage() {
           </p>
         </Card>
 
-        <Card className="p-5 animate-slide-up stagger-2">
+        <Card hover className="p-5 animate-slide-up stagger-2 cursor-pointer" onClick={() => router.push('/accounts')}>
           <div className="flex items-center justify-between mb-2">
             <p className="font-body text-xs text-flourish-muted uppercase tracking-wider">Liabilities</p>
             <CreditCard className="w-4 h-4 text-red-500" />
@@ -152,7 +154,7 @@ export default function DashboardPage() {
           </p>
         </Card>
 
-        <Card className="p-5 animate-slide-up stagger-3">
+        <Card hover className="p-5 animate-slide-up stagger-3 cursor-pointer" onClick={() => router.push('/investments')}>
           <div className="flex items-center justify-between mb-2">
             <p className="font-body text-xs text-flourish-muted uppercase tracking-wider">Investments</p>
             <TrendingUp className="w-4 h-4 text-flourish-orange" />
@@ -221,7 +223,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {upcomingBills.map((bill, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-[#fdf8f4] rounded-xl">
+                  <button
+                    key={idx}
+                    onClick={() => router.push(`/transactions?merchant=${encodeURIComponent(bill.merchant)}`)}
+                    className="w-full flex items-center justify-between p-3 bg-[#fdf8f4] rounded-xl hover:bg-[#f0e8e0] transition-colors text-left"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="text-2xl">{bill.emoji}</div>
                       <div>
@@ -235,7 +241,7 @@ export default function DashboardPage() {
                       <p className="font-display font-bold text-flourish-dark">{formatCurrency(bill.amount)}</p>
                       <p className="text-xs text-flourish-muted">{bill.nextDate}</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -254,7 +260,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 {recentTransactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-[#fdf8f4] rounded-xl transition-colors">
+                  <button
+                    key={tx.id}
+                    onClick={() => router.push(`/transactions?merchant=${encodeURIComponent(tx.merchantName)}`)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-[#fdf8f4] rounded-xl transition-colors text-left"
+                  >
                     <div className="flex items-center gap-3">
                       <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
@@ -268,7 +278,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <p className="font-display font-bold text-flourish-dark">-{formatCurrency(tx.amount)}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
