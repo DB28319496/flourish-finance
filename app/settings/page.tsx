@@ -5,6 +5,7 @@ import { User, Bell, Shield, Palette, CreditCard, Link2, LogOut } from 'lucide-r
 import { Card } from '@/components/ui';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
+import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { cn } from '@/lib/utils';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance' | 'billing' | 'connections';
@@ -39,8 +40,9 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const { userSettings, updateUserSetting } = useData();
+  const { userSettings, updateUserSetting, linkedItems, accountGroups, disconnectBank, connectBank } = useData();
   const { user, signOut } = useAuth();
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   const emailNotifs = userSettings.emailNotifs ?? true;
   const pushNotifs = userSettings.pushNotifs ?? true;
@@ -281,25 +283,58 @@ export default function SettingsPage() {
 
             {activeTab === 'connections' && (
               <Card className="p-8 animate-slide-up">
-                <h2 className="font-display text-xl font-bold text-flourish-text mb-6">Connected Accounts</h2>
+                <h2 className="font-display text-xl font-bold text-flourish-text mb-2">Connected Accounts</h2>
+                <p className="text-sm text-flourish-secondary mb-6">
+                  {linkedItems.length > 0
+                    ? `${linkedItems.length} institution${linkedItems.length > 1 ? 's' : ''} connected via Plaid`
+                    : user
+                    ? 'No banks connected yet'
+                    : 'Sign in to manage your connected accounts'}
+                </p>
                 <div className="space-y-4">
-                  {['Chase Bank', 'Bank of America', 'Fidelity Investments'].map((bank) => (
-                    <div key={bank} className="flex items-center justify-between py-3 border-b border-flourish-border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-flourish-hover flex items-center justify-center">
-                          <span className="text-sm font-bold text-flourish-dark">{bank.charAt(0)}</span>
+                  {linkedItems.length > 0 ? (
+                    linkedItems.map((item) => {
+                      const itemAccounts = accountGroups
+                        .flatMap((g) => g.accounts)
+                        .filter((a: any) => a.item_id === item.item_id);
+                      return (
+                        <div key={item.item_id} className="flex items-center justify-between py-3 border-b border-flourish-border">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-flourish-hover flex items-center justify-center">
+                              <span className="text-sm font-bold text-flourish-dark">
+                                {item.institution_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-flourish-dark">{item.institution_name}</p>
+                              <p className="text-xs text-emerald-500">
+                                Connected{itemAccounts.length > 0 ? ` — ${itemAccounts.length} account${itemAccounts.length > 1 ? 's' : ''}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Disconnect ${item.institution_name}? This will stop syncing its accounts.`)) return;
+                              setDisconnecting(item.item_id);
+                              try { await disconnectBank(item.item_id); } finally { setDisconnecting(null); }
+                            }}
+                            disabled={disconnecting === item.item_id}
+                            className="text-xs font-medium text-red-500 hover:underline disabled:opacity-50"
+                          >
+                            {disconnecting === item.item_id ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-flourish-dark">{bank}</p>
-                          <p className="text-xs text-emerald-500">Connected</p>
-                        </div>
-                      </div>
-                      <button className="text-xs font-medium text-red-500 hover:underline">Disconnect</button>
-                    </div>
-                  ))}
-                  <button className="w-full py-3 border-2 border-dashed border-flourish-border rounded-xl text-sm font-medium text-flourish-secondary hover:border-flourish-orange hover:text-flourish-orange transition-colors">
-                    + Connect New Account
-                  </button>
+                      );
+                    })
+                  ) : user ? (
+                    <p className="text-center py-8 text-sm text-flourish-muted">
+                      Click below to connect your first bank or credit card account
+                    </p>
+                  ) : null}
+
+                  {user && (
+                    <PlaidLinkButton className="w-full py-3 flex items-center justify-center gap-2 border-2 border-dashed border-flourish-border rounded-xl text-sm font-medium text-flourish-secondary hover:border-flourish-orange hover:text-flourish-orange hover:bg-orange-50/30 transition-colors disabled:opacity-50" />
+                  )}
                 </div>
               </Card>
             )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
 import { getPlaidClient } from "@/lib/plaid-server";
+import { getUserHouseholdId } from "@/lib/household-helpers";
 
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
@@ -18,7 +19,29 @@ export async function POST(req: NextRequest) {
     }
 
     const tokenData = tokenDoc.data();
-    if (tokenData?.user_id !== uid) {
+
+    // Permission check: either the token is owned by this user, or the user
+    // is a member of the household that owns the token
+    let authorized = tokenData?.user_id === uid;
+
+    if (!authorized) {
+      const householdId = await getUserHouseholdId(uid);
+      if (householdId) {
+        // Token household_id match
+        if (tokenData?.household_id === householdId) {
+          authorized = true;
+        } else if (tokenData?.user_id === "unknown") {
+          // Household-shared token (iOS app model)
+          const householdDoc = await adminDb.collection("households").doc(householdId).get();
+          const memberIds = (householdDoc.data()?.memberUserIDs as string[]) || [];
+          if (memberIds.includes(uid)) {
+            authorized = true;
+          }
+        }
+      }
+    }
+
+    if (!authorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

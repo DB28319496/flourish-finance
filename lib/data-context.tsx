@@ -160,6 +160,7 @@ function plaidAccountsToGroups(accounts: PlaidAccount[]): AccountGroup[] {
         icon: meta.icon,
         accounts: grouped[type].map((a) => ({
           id: a.account_id,
+          item_id: (a as any).item_id,
           name: `${a.name}${a.mask ? ` ...${a.mask}` : ""}`,
           institution: (a as any).institution_name || "Bank",
           type: plaidTypeToAccountType(a.type),
@@ -170,7 +171,7 @@ function plaidAccountsToGroups(accounts: PlaidAccount[]): AccountGroup[] {
           monthChange: 0,
           sparklineData: [a.current_balance || 0],
           creditLimit: (a as any).limit || undefined,
-        })),
+        })) as any,
       };
     });
 }

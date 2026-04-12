@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
 import { getPlaidClient } from "@/lib/plaid-server";
 import { FieldValue } from "firebase-admin/firestore";
+import { getUserHouseholdId } from "@/lib/household-helpers";
 
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
@@ -18,10 +19,14 @@ export async function POST(req: NextRequest) {
     const accessToken = exchangeResponse.data.access_token;
     const itemId = exchangeResponse.data.item_id;
 
+    // Store with household_id so it's shared across household members (matches iOS model)
+    const householdId = await getUserHouseholdId(uid);
+
     await adminDb.collection("plaid_access_tokens").doc(itemId).set({
       access_token: accessToken,
       item_id: itemId,
       user_id: uid,
+      household_id: householdId || null,
       created_at: FieldValue.serverTimestamp(),
       is_active: true,
     });
