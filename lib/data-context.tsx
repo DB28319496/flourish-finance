@@ -68,7 +68,8 @@ interface DataContextType {
   sendChatMessage: (
     message: string,
     history?: { role: string; content: string }[]
-  ) => Promise<string>;
+  ) => Promise<{ response: string; actions: { tool: string; input: any; result: any }[] }>;
+  refreshAllUserData: () => Promise<void>;
 
   // Cash Flow
   cashFlowMonths: CashFlowMonth[];
@@ -589,7 +590,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const sendChatMessage = useCallback(async (
     message: string,
     history: { role: string; content: string }[] = []
-  ): Promise<string> => {
+  ): Promise<{ response: string; actions: { tool: string; input: any; result: any }[] }> => {
     const token = await getIdToken();
     if (!token) throw new Error("Not authenticated");
 
@@ -669,8 +670,23 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
       conversationHistory: history,
       financialContext,
     });
-    return data.response;
+    return { response: data.response, actions: data.actions || [] };
   }, [getIdToken, accounts, rawTransactions]);
+
+  // Refresh all user-specific Firestore data (used after AI actions)
+  const refreshAllUserData = useCallback(async () => {
+    if (!user) return;
+    const [budgets, settings, userGoals, edits] = await Promise.all([
+      firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
+      firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
+      firestore.listCollection<Goal>(user.uid, "goals"),
+      firestore.listCollection<TransactionEdit & { id: string }>(user.uid, "transaction_edits"),
+    ]);
+    if (budgets) setBudgetTargets(budgets);
+    if (settings) setUserSettings(settings);
+    setGoals(userGoals);
+    setTransactionEdits(Object.fromEntries(edits.map((e) => [e.id, e as TransactionEdit])));
+  }, [user]);
 
   // ---------------------------------------------------------------------------
   // Load on mount
@@ -740,6 +756,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
         isLoading, isUsingMockData, error,
         refreshAccounts, refreshTransactions, connectBank, disconnectBank,
         sendChatMessage,
+        refreshAllUserData,
         // Computed
         cashFlowMonths, expensesByCategory, incomeBySource,
         monthlyData, flatTransactions, transactionStats,

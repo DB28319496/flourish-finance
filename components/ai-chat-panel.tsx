@@ -1,21 +1,35 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, X, Send, Loader2 } from 'lucide-react';
+import { Sparkles, X, Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  actions?: { tool: string; input: any; result: any }[];
 }
 
 const STARTER_QUESTIONS = [
-  'How much did I spend on dining last month?',
+  'Add a $10,000 emergency fund goal by December',
+  "Set my Food and Drink budget to $500",
   "What's my biggest recurring expense?",
-  'Am I on track to hit my savings goals?',
   'Analyze my investment portfolio',
 ];
+
+// Friendly labels for tool actions
+const TOOL_LABELS: Record<string, (input: any, result: any) => string> = {
+  create_goal: (input) => `Created goal: ${input.name} ($${input.target?.toLocaleString()})`,
+  update_goal: (input) => `Updated goal`,
+  delete_goal: () => `Deleted goal`,
+  list_goals: (_, result) => `Listed ${result?.result?.goals?.length ?? 0} goals`,
+  set_budget_target: (input) => `Set ${input.category} budget to $${input.amount}`,
+  exclude_from_recurring: (input) => `Hid ${input.merchant} from recurring`,
+  update_transaction: (input) => `Updated transaction`,
+  update_setting: (input) => `Updated setting: ${input.key}`,
+  add_manual_recurring: (input) => `Added ${input.type}: ${input.name} ($${input.amount} ${input.frequency})`,
+};
 
 export function AIChatPanel({
   open,
@@ -24,7 +38,7 @@ export function AIChatPanel({
   open: boolean;
   onClose: () => void;
 }) {
-  const { sendChatMessage, isUsingMockData } = useData();
+  const { sendChatMessage, isUsingMockData, refreshAllUserData } = useData();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -38,13 +52,12 @@ export function AIChatPanel({
     }
   }, [open]);
 
-  // Listen for "Ask AI" events from other pages (e.g., Advice page)
+  // Listen for "Ask AI" events from other pages
   useEffect(() => {
     const handler = (e: Event) => {
       const ce = e as CustomEvent<{ prompt: string }>;
       const prompt = ce.detail?.prompt;
       if (prompt) {
-        // open the panel first
         window.dispatchEvent(new CustomEvent('flourish:open-ai-chat'));
         setTimeout(() => handleSend(prompt), 200);
       }
@@ -66,7 +79,7 @@ export function AIChatPanel({
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: message },
-        { role: 'assistant', content: 'Please sign in to chat with your AI Assistant. The chat needs your financial data to give personalized insights.' },
+        { role: 'assistant', content: 'Please sign in to chat with your AI Assistant and let me take actions on your behalf.' },
       ]);
       setInput('');
       return;
@@ -77,8 +90,13 @@ export function AIChatPanel({
     setLoading(true);
 
     try {
-      const response = await sendChatMessage(message, messages);
-      setMessages((prev) => [...prev, { role: 'assistant', content: response }]);
+      const { response, actions } = await sendChatMessage(message, messages);
+      setMessages((prev) => [...prev, { role: 'assistant', content: response, actions }]);
+
+      // If AI took actions that modify user data, refresh
+      if (actions && actions.length > 0) {
+        await refreshAllUserData();
+      }
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: 'assistant', content: `Sorry, I ran into an error: ${err.message}` }]);
     } finally {
@@ -111,7 +129,7 @@ export function AIChatPanel({
             <div>
               <h2 className="font-display text-lg font-bold text-flourish-dark">AI Assistant</h2>
               <p className="text-xs text-flourish-secondary">
-                {isUsingMockData ? 'Demo mode — sign in for real data' : 'Powered by Claude'}
+                {isUsingMockData ? 'Demo mode — sign in for real data' : 'Can answer questions and take actions'}
               </p>
             </div>
           </div>
@@ -135,13 +153,13 @@ export function AIChatPanel({
                   How can I help?
                 </h3>
                 <p className="text-sm text-flourish-secondary">
-                  Ask about your spending, savings, or investments
+                  Ask questions or tell me to do something
                 </p>
               </div>
 
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wider text-flourish-secondary mb-3">
-                  Try asking
+                  Try this
                 </p>
                 {STARTER_QUESTIONS.map((q) => (
                   <button
@@ -160,14 +178,43 @@ export function AIChatPanel({
                 key={idx}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                    msg.role === 'user'
-                      ? 'bg-flourish-orange text-white rounded-br-md'
-                      : 'bg-[#fdf8f4] text-flourish-dark rounded-bl-md'
-                  }`}
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                <div className={`max-w-[85%] space-y-2 ${msg.role === 'user' ? '' : 'w-full'}`}>
+                  <div
+                    className={`rounded-2xl px-4 py-3 ${
+                      msg.role === 'user'
+                        ? 'bg-flourish-orange text-white rounded-br-md ml-auto'
+                        : 'bg-[#fdf8f4] text-flourish-dark rounded-bl-md'
+                    } ${msg.role === 'user' ? 'inline-block' : ''}`}
+                  >
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+
+                  {/* Action pills */}
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="space-y-1.5">
+                      {msg.actions.map((a, i) => {
+                        const label = TOOL_LABELS[a.tool]?.(a.input, a.result) ?? a.tool;
+                        const ok = a.result?.success !== false;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+                              ok
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-red-50 text-red-800 border border-red-200'
+                            }`}
+                          >
+                            {ok ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                            )}
+                            <span className="font-medium">{label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -192,7 +239,7 @@ export function AIChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about your finances..."
+              placeholder="Ask a question or give a command..."
               className="flex-1 bg-transparent text-sm text-flourish-dark placeholder-flourish-secondary outline-none"
               disabled={loading}
             />
@@ -205,7 +252,7 @@ export function AIChatPanel({
             </button>
           </div>
           <p className="text-[10px] text-flourish-secondary text-center mt-2">
-            AI can make mistakes. Verify important financial decisions.
+            AI can take actions on your behalf. Verify important decisions.
           </p>
         </div>
       </div>
