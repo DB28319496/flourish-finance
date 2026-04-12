@@ -24,7 +24,11 @@ import {
   type BudgetSection,
   type HoldingGroup,
   type Benchmark,
+  type Goal,
+  type UserSettings,
+  type TransactionEdit,
 } from "./mock-data";
+import * as firestore from "./firestore-helpers";
 import {
   computeCashFlowMonths,
   computeExpenseBreakdown,
@@ -96,6 +100,23 @@ interface DataContextType {
   holdingGroups: HoldingGroup[];
   benchmarks: Benchmark[];
   refreshInvestments: () => Promise<void>;
+
+  // Goals
+  goals: Goal[];
+  addGoal: (goal: Omit<Goal, "id" | "createdAt">) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+
+  // Settings
+  userSettings: UserSettings;
+  updateUserSetting: <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => Promise<void>;
+
+  // Transaction edits (merged into transactionGroups)
+  transactionEdits: Record<string, TransactionEdit>;
+  updateTransaction: (txId: string, edits: TransactionEdit) => Promise<void>;
+
+  // Net worth timeline
+  netWorthTimeline: { date: string; value: number }[];
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -301,6 +322,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [budgetTargets, setBudgetTargets] = useState<Record<string, number>>({});
   const [investmentHoldings, setInvestmentHoldings] = useState<HoldingGroup[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [userSettings, setUserSettings] = useState<UserSettings>({});
+  const [transactionEdits, setTransactionEdits] = useState<Record<string, TransactionEdit>>({});
+  const [netWorthSnapshots, setNetWorthSnapshots] = useState<{ date: string; value: number }[]>([]);
 
   // Use mock data if not logged in OR if logged in but no real data was fetched
   const hasRealData = accounts.length > 0 || rawTransactions.length > 0;
@@ -309,9 +334,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // -- Account groups
   const accountGroups = isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.account_id, a])), [accounts]);
-  const transactionGroups = isUsingMockData
-    ? mockTransactionGroups
-    : plaidTransactionsToGroups(rawTransactions, accountMap);
+
+  // Apply transaction edits to groups
+  const transactionGroups = useMemo(() => {
+    const base = isUsingMockData
+      ? mockTransactionGroups
+      : plaidTransactionsToGroups(rawTransactions, accountMap);
+
+    if (Object.keys(transactionEdits).length === 0) return base;
+
+    return base.map((group) => ({
+      ...group,
+      transactions: group.transactions.map((tx) => {
+        const edit = transactionEdits[tx.id];
+        if (!edit) return tx;
+        return {
+          ...tx,
+          merchantName: edit.merchantName ?? tx.merchantName,
+          notes: edit.notes ?? tx.notes,
+          isFlagged: edit.isFlagged ?? tx.isFlagged,
+          isRecurring: edit.isRecurring ?? tx.isRecurring,
+          category: edit.category
+            ? { ...tx.category, name: edit.category }
+            : tx.category,
+        };
+      }),
+    }));
+  }, [isUsingMockData, rawTransactions, accountMap, transactionEdits]);
 
   // -- Cash flow (computed from transactions)
   const cashFlowMonths = useMemo(
@@ -376,6 +425,40 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   );
 
   const benchmarks = mockBenchmarks; // Always mock until market data API is added
+
+  // -- Net worth timeline (combine snapshots with current value)
+  const netWorthTimeline = useMemo(() => {
+    if (isUsingMockData || netWorthSnapshots.length === 0) {
+      // Fall back to generated timeline (mock)
+      const points: { date: string; value: number }[] = [];
+      const totalAssets = accounts
+        .filter((a) => a.type !== "credit" && a.type !== "loan")
+        .reduce((s, a) => s + (a.current_balance || 0), 0);
+      const totalLiabilities = accounts
+        .filter((a) => a.type === "credit" || a.type === "loan")
+        .reduce((s, a) => s + (a.current_balance || 0), 0);
+      const current = isUsingMockData ? 56059.78 : totalAssets - totalLiabilities;
+
+      for (let i = 30; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const progress = (30 - i) / 30;
+        points.push({
+          date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          value: current * 0.95 + current * 0.05 * progress + (Math.random() - 0.5) * 500,
+        });
+      }
+      return points;
+    }
+
+    // Sort snapshots by date and format for chart
+    return netWorthSnapshots
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((s) => ({
+        date: new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        value: s.value,
+      }));
+  }, [isUsingMockData, netWorthSnapshots, accounts]);
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -455,6 +538,41 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [budgetTargets, user]);
 
+  // Goals
+  const addGoal = useCallback(async (goal: Omit<Goal, "id" | "createdAt">) => {
+    const id = `goal_${Date.now()}`;
+    const newGoal: Goal = { ...goal, id, createdAt: Date.now() };
+    setGoals((prev) => [...prev, newGoal]);
+    if (user) await firestore.setDoc(user.uid, ["goals", id], newGoal as any);
+  }, [user]);
+
+  const updateGoal = useCallback(async (id: string, updates: Partial<Goal>) => {
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+    if (user) await firestore.setDoc(user.uid, ["goals", id], updates as any);
+  }, [user]);
+
+  const deleteGoal = useCallback(async (id: string) => {
+    setGoals((prev) => prev.filter((g) => g.id !== id));
+    if (user) await firestore.deleteDoc(user.uid, ["goals", id]);
+  }, [user]);
+
+  // User Settings
+  const updateUserSetting = useCallback(async <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K]
+  ) => {
+    const newSettings = { ...userSettings, [key]: value };
+    setUserSettings(newSettings);
+    if (user) await firestore.setDoc(user.uid, ["settings", "user"], newSettings as any);
+  }, [userSettings, user]);
+
+  // Transaction edits
+  const updateTransaction = useCallback(async (txId: string, edits: TransactionEdit) => {
+    const merged = { ...transactionEdits[txId], ...edits };
+    setTransactionEdits((prev) => ({ ...prev, [txId]: merged }));
+    if (user) await firestore.setDoc(user.uid, ["transaction_edits", txId], merged as any);
+  }, [transactionEdits, user]);
+
   const sendChatMessage = useCallback(async (
     message: string,
     history: { role: string; content: string }[] = []
@@ -496,22 +614,55 @@ Recent Transactions: ${rawTransactions.slice(0, 20).map((t) => `${t.date}: ${t.m
     }
     setIsLoading(true);
 
-    // Load budget targets from Firestore
+    // Load all user data from Firestore in parallel
     (async () => {
-      try {
-        const { doc, getDoc } = await import("firebase/firestore");
-        const { db } = await import("./firebase");
-        if (!db) return;
-        const snap = await getDoc(doc(db, "users", user.uid, "settings", "budget_targets"));
-        if (snap.exists()) setBudgetTargets(snap.data() as Record<string, number>);
-      } catch (err) {
-        console.warn("Failed to load budget targets:", err);
-      }
+      const [budgets, settings, userGoals, edits, snapshots] = await Promise.all([
+        firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
+        firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
+        firestore.listCollection<Goal>(user.uid, "goals"),
+        firestore.listCollection<TransactionEdit & { id: string }>(user.uid, "transaction_edits"),
+        firestore.listCollection<{ value: number }>(user.uid, "snapshots"),
+      ]);
+
+      if (budgets) setBudgetTargets(budgets);
+      if (settings) setUserSettings(settings);
+      setGoals(userGoals);
+      setTransactionEdits(
+        Object.fromEntries(edits.map((e) => [e.id, e as TransactionEdit]))
+      );
+      setNetWorthSnapshots(snapshots.map((s) => ({ date: s.id, value: s.value })));
     })();
 
     Promise.all([refreshAccounts(), refreshTransactions(90), refreshInvestments()])
       .finally(() => setIsLoading(false));
   }, [user, refreshAccounts, refreshTransactions, refreshInvestments]);
+
+  // Save today's net worth snapshot when accounts update
+  useEffect(() => {
+    if (!user || accounts.length === 0) return;
+    const totalAssets = accounts
+      .filter((a) => a.type !== "credit" && a.type !== "loan")
+      .reduce((s, a) => s + (a.current_balance || 0), 0);
+    const totalLiabilities = accounts
+      .filter((a) => a.type === "credit" || a.type === "loan")
+      .reduce((s, a) => s + (a.current_balance || 0), 0);
+    const value = totalAssets - totalLiabilities;
+
+    const today = new Date().toISOString().split("T")[0];
+    firestore.setDoc(user.uid, ["snapshots", today], {
+      value,
+      assets: totalAssets,
+      liabilities: totalLiabilities,
+      timestamp: Date.now(),
+    });
+
+    // Update local snapshot array
+    setNetWorthSnapshots((prev) => {
+      const existing = prev.find((s) => s.date === today);
+      if (existing) return prev.map((s) => (s.date === today ? { date: today, value } : s));
+      return [...prev, { date: today, value }];
+    });
+  }, [user, accounts]);
 
   return (
     <DataContext.Provider
@@ -527,6 +678,14 @@ Recent Transactions: ${rawTransactions.slice(0, 20).map((t) => `${t.date}: ${t.m
         budgetSections, budgetTargets, updateBudgetTarget,
         insights, notifications,
         holdingGroups, benchmarks, refreshInvestments,
+        // Goals
+        goals, addGoal, updateGoal, deleteGoal,
+        // Settings
+        userSettings, updateUserSetting,
+        // Transaction edits
+        transactionEdits, updateTransaction,
+        // Net worth timeline
+        netWorthTimeline,
       }}
     >
       {children}

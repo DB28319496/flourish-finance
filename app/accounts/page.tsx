@@ -24,7 +24,6 @@ import {
 } from "@/components/ui";
 import {
   formatCurrency,
-  generateNetWorthTimeline,
 } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
@@ -62,7 +61,7 @@ function formatLastSynced(timeStr: string): string {
 }
 
 export default function AccountsPage() {
-  const { accountGroups, isLoading, isUsingMockData } = useData();
+  const { accountGroups, netWorthTimeline, isLoading, isUsingMockData } = useData();
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
@@ -75,7 +74,6 @@ export default function AccountsPage() {
     .filter((g) => g.type === "creditCards" || g.type === "loans")
     .reduce((sum, g) => sum + g.accounts.reduce((s, a) => s + a.balance, 0), 0);
   const netWorth = assets - liabilities;
-  const netWorthTimeline = generateNetWorthTimeline();
 
   const toggleGroup = (groupId: string) => {
     const newExpanded = new Set(expandedGroups);

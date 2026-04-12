@@ -264,6 +264,28 @@ export function EmptyState({
 // Badge
 // =============================================================================
 
+// =============================================================================
+// Skeleton
+// =============================================================================
+
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("animate-pulse bg-flourish-bg rounded-lg", className)} />
+  );
+}
+
+export function SkeletonCard({ className }: { className?: string }) {
+  return (
+    <Card className={cn("p-6", className)}>
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-3 w-full" />
+      </div>
+    </Card>
+  );
+}
+
 export function Badge({
   children,
   variant = "default",

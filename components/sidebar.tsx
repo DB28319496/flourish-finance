@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { SearchModal } from './search-modal';
 import { NotificationsPanel } from './notifications-panel';
+import { AIChatPanel } from './ai-chat-panel';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -40,15 +41,18 @@ const navItems = [
 export function Sidebar({
   collapsed,
   onToggle,
+  onNavigate,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
 
   return (
     <>
@@ -132,6 +136,7 @@ export function Sidebar({
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    onClick={onNavigate}
                     title={collapsed ? item.label : undefined}
                     className={`flex items-center gap-3 rounded-xl transition-all duration-200 group ${
                       collapsed ? 'px-0 py-2.5 justify-center' : 'px-4 py-2.5'
@@ -193,7 +198,10 @@ export function Sidebar({
               </div>
 
               {/* AI Assistant */}
-              <button className="flex items-center gap-2 text-flourish-orange hover:opacity-80 transition-opacity">
+              <button
+                onClick={() => setAiChatOpen(true)}
+                className="flex items-center gap-2 text-flourish-orange hover:opacity-80 transition-opacity"
+              >
                 <Sparkles size={18} />
                 <span className="text-sm font-semibold">AI Assistant</span>
               </button>
@@ -235,6 +243,7 @@ export function Sidebar({
           ) : (
             <>
               <button
+                onClick={() => setAiChatOpen(true)}
                 title="AI Assistant"
                 className="w-full flex justify-center text-flourish-orange hover:opacity-80 transition-opacity"
               >
@@ -265,6 +274,7 @@ export function Sidebar({
       {/* Modals & Panels */}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <NotificationsPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <AIChatPanel open={aiChatOpen} onClose={() => setAiChatOpen(false)} />
     </>
   );
 }

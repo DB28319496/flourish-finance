@@ -32,7 +32,7 @@ type FilterTab = "All" | "Receipts";
 // =============================================================================
 
 export default function TransactionsPage() {
-  const { transactionGroups } = useData();
+  const { transactionGroups, updateTransaction } = useData();
 
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,7 +62,16 @@ export default function TransactionsPage() {
     setEditingTransaction({ ...transaction });
   };
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
+    if (editingTransaction) {
+      await updateTransaction(editingTransaction.id, {
+        merchantName: editingTransaction.merchantName,
+        notes: editingTransaction.notes,
+        isFlagged: editingTransaction.isFlagged,
+        isRecurring: editingTransaction.isRecurring,
+        category: editingTransaction.category.name,
+      });
+    }
     setSelectedTransaction(null);
     setEditingTransaction(null);
   };

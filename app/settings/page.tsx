@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { User, Bell, Shield, Palette, CreditCard, Link2, LogOut } from 'lucide-react';
 import { Card } from '@/components/ui';
+import { useData } from '@/lib/data-context';
+import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance' | 'billing' | 'connections';
@@ -37,12 +39,15 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(false);
-  const [budgetAlerts, setBudgetAlerts] = useState(true);
-  const [largeTransactions, setLargeTransactions] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const { userSettings, updateUserSetting } = useData();
+  const { user, signOut } = useAuth();
+
+  const emailNotifs = userSettings.emailNotifs ?? true;
+  const pushNotifs = userSettings.pushNotifs ?? true;
+  const weeklyReport = userSettings.weeklyReport ?? false;
+  const budgetAlerts = userSettings.budgetAlerts ?? true;
+  const largeTransactions = userSettings.largeTransactions ?? true;
+  const darkMode = userSettings.darkMode ?? false;
 
   return (
     <div className="min-h-screen bg-flourish-bg">
@@ -75,12 +80,17 @@ export default function SettingsPage() {
               );
             })}
 
-            <div className="pt-4 border-t border-flourish-border mt-4">
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
-                <LogOut size={18} />
-                Sign Out
-              </button>
-            </div>
+            {user && (
+              <div className="pt-4 border-t border-flourish-border mt-4">
+                <button
+                  onClick={() => signOut()}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut size={18} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -92,52 +102,48 @@ export default function SettingsPage() {
                   {/* Avatar */}
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-flourish-orange to-flourish-orange/70 flex items-center justify-center">
-                      <span className="text-white text-xl font-semibold">JD</span>
+                      <span className="text-white text-xl font-semibold">
+                        {(user?.displayName || user?.email || "U").charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    <button className="px-4 py-2 text-sm font-medium text-flourish-orange border border-flourish-orange rounded-lg hover:bg-orange-50 transition-colors">
-                      Change Photo
-                    </button>
+                    <div>
+                      <p className="text-sm font-medium text-flourish-dark">{user?.displayName || 'User'}</p>
+                      <p className="text-xs text-flourish-secondary">{user?.email || 'Not signed in'}</p>
+                    </div>
                   </div>
 
                   {/* Form Fields */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-flourish-dark mb-1.5">First Name</label>
-                      <input
-                        type="text"
-                        defaultValue="John"
-                        className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-flourish-dark mb-1.5">Last Name</label>
-                      <input
-                        type="text"
-                        defaultValue="Doe"
-                        className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-flourish-dark mb-1.5">Display Name</label>
+                    <input
+                      type="text"
+                      defaultValue={userSettings.displayName || user?.displayName || ''}
+                      onBlur={(e) => updateUserSetting('displayName', e.target.value)}
+                      placeholder="Your name"
+                      className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-flourish-dark mb-1.5">Email</label>
                     <input
                       type="email"
-                      defaultValue="john@example.com"
-                      className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-secondary bg-gray-50 cursor-not-allowed"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-flourish-dark mb-1.5">Currency</label>
-                    <select className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange">
-                      <option>USD ($)</option>
-                      <option>EUR (&euro;)</option>
-                      <option>GBP (&pound;)</option>
+                    <select
+                      value={userSettings.currency || 'USD'}
+                      onChange={(e) => updateUserSetting('currency', e.target.value)}
+                      className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (&euro;)</option>
+                      <option value="GBP">GBP (&pound;)</option>
                     </select>
                   </div>
-
-                  <button className="px-6 py-2.5 bg-flourish-orange text-white text-sm font-medium rounded-xl hover:bg-orange-600 transition-colors">
-                    Save Changes
-                  </button>
                 </div>
               </Card>
             )}
@@ -151,35 +157,35 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-flourish-dark">Email Notifications</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Receive updates via email</p>
                     </div>
-                    <Toggle enabled={emailNotifs} onChange={() => setEmailNotifs(!emailNotifs)} />
+                    <Toggle enabled={emailNotifs} onChange={() => updateUserSetting('emailNotifs', !emailNotifs)} />
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-flourish-border">
                     <div>
                       <p className="text-sm font-medium text-flourish-dark">Push Notifications</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Browser push notifications</p>
                     </div>
-                    <Toggle enabled={pushNotifs} onChange={() => setPushNotifs(!pushNotifs)} />
+                    <Toggle enabled={pushNotifs} onChange={() => updateUserSetting('pushNotifs', !pushNotifs)} />
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-flourish-border">
                     <div>
                       <p className="text-sm font-medium text-flourish-dark">Weekly Report</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Get a weekly summary of your finances</p>
                     </div>
-                    <Toggle enabled={weeklyReport} onChange={() => setWeeklyReport(!weeklyReport)} />
+                    <Toggle enabled={weeklyReport} onChange={() => updateUserSetting('weeklyReport', !weeklyReport)} />
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-flourish-border">
                     <div>
                       <p className="text-sm font-medium text-flourish-dark">Budget Alerts</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Alert when nearing budget limits</p>
                     </div>
-                    <Toggle enabled={budgetAlerts} onChange={() => setBudgetAlerts(!budgetAlerts)} />
+                    <Toggle enabled={budgetAlerts} onChange={() => updateUserSetting('budgetAlerts', !budgetAlerts)} />
                   </div>
                   <div className="flex items-center justify-between py-3">
                     <div>
                       <p className="text-sm font-medium text-flourish-dark">Large Transaction Alerts</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Notify on transactions over $500</p>
                     </div>
-                    <Toggle enabled={largeTransactions} onChange={() => setLargeTransactions(!largeTransactions)} />
+                    <Toggle enabled={largeTransactions} onChange={() => updateUserSetting('largeTransactions', !largeTransactions)} />
                   </div>
                 </div>
               </Card>
@@ -229,7 +235,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-flourish-dark">Dark Mode</p>
                       <p className="text-xs text-flourish-secondary mt-0.5">Switch to a darker theme</p>
                     </div>
-                    <Toggle enabled={darkMode} onChange={() => setDarkMode(!darkMode)} />
+                    <Toggle enabled={darkMode} onChange={() => updateUserSetting('darkMode', !darkMode)} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-flourish-dark mb-3">Accent Color</p>

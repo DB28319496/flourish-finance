@@ -115,6 +115,38 @@ export interface Benchmark {
   color: string;
 }
 
+export interface Goal {
+  id: string;
+  name: string;
+  target: number;
+  current: number;
+  icon: string;
+  color: string;
+  deadline: string;
+  monthlyContribution: number;
+  createdAt?: number;
+}
+
+export interface UserSettings {
+  emailNotifs?: boolean;
+  pushNotifs?: boolean;
+  weeklyReport?: boolean;
+  budgetAlerts?: boolean;
+  largeTransactions?: boolean;
+  darkMode?: boolean;
+  accentColor?: string;
+  displayName?: string;
+  currency?: string;
+}
+
+export interface TransactionEdit {
+  merchantName?: string;
+  notes?: string;
+  isFlagged?: boolean;
+  isRecurring?: boolean;
+  category?: string;
+}
+
 // ---------------------------------------------------------------------------
 // DATA
 // ---------------------------------------------------------------------------
