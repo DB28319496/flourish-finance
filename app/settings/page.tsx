@@ -40,7 +40,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const { userSettings, updateUserSetting, linkedItems, accountGroups, disconnectBank, connectBank } = useData();
+  const { userSettings, updateUserSetting, linkedItems, brokenItems, accountGroups, disconnectBank, connectBank } = useData();
   const { user, signOut } = useAuth();
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
@@ -286,11 +286,22 @@ export default function SettingsPage() {
                 <h2 className="font-display text-xl font-bold text-flourish-text mb-2">Connected Accounts</h2>
                 <p className="text-sm text-flourish-secondary mb-6">
                   {linkedItems.length > 0
-                    ? `${linkedItems.length} institution${linkedItems.length > 1 ? 's' : ''} connected via Plaid`
+                    ? `${linkedItems.length} institution${linkedItems.length > 1 ? 's' : ''} connected via Plaid${brokenItems.length > 0 ? ` · ${brokenItems.length} needing attention` : ''}`
                     : user
                     ? 'No banks connected yet'
                     : 'Sign in to manage your connected accounts'}
                 </p>
+
+                {brokenItems.length > 0 && (
+                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-sm font-semibold text-amber-900 mb-1">
+                      {brokenItems.length} connection{brokenItems.length > 1 ? 's need' : ' needs'} attention
+                    </p>
+                    <p className="text-xs text-amber-800">
+                      Some banks require you to reconnect (login expired). Transactions from these accounts won't update until reconnected.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-4">
                   {linkedItems.length > 0 ? (
                     linkedItems.map((item) => {

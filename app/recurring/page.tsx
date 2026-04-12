@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Card, PillToggle, ProgressBar, Badge } from '@/components/ui';
 import { formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
 import { useData } from '@/lib/data-context';
@@ -53,6 +54,11 @@ export default function RecurringPage() {
   };
 
   const { recurringTransactions } = useData();
+  const router = useRouter();
+
+  const viewTransactions = (merchant: string) => {
+    router.push(`/transactions?merchant=${encodeURIComponent(merchant)}`);
+  };
   const incomeItems = recurringTransactions.income;
   const expenseItems = recurringTransactions.expenses;
   const creditCardItems = recurringTransactions.creditCards;
@@ -183,8 +189,12 @@ export default function RecurringPage() {
                           {item.nextDate}
                         </p>
                       </div>
-                      <button className="p-2 hover:bg-flourish-border rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4 text-flourish-muted" />
+                      <button
+                        onClick={() => viewTransactions(item.merchant)}
+                        title="View transactions from this merchant"
+                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
                       </button>
                     </div>
                   </div>
@@ -286,8 +296,12 @@ export default function RecurringPage() {
                           {item.daysUntil} days
                         </p>
                       </div>
-                      <button className="p-2 hover:bg-flourish-border rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4 text-flourish-muted" />
+                      <button
+                        onClick={() => viewTransactions(item.merchant)}
+                        title="View transactions from this merchant"
+                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
                       </button>
                     </div>
                   </div>
@@ -337,8 +351,12 @@ export default function RecurringPage() {
                           {item.daysUntil} days
                         </p>
                       </div>
-                      <button className="p-2 hover:bg-flourish-border rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4 text-flourish-muted" />
+                      <button
+                        onClick={() => viewTransactions(item.merchant)}
+                        title="View transactions from this merchant"
+                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
                       </button>
                     </div>
                   </div>
@@ -390,8 +408,12 @@ export default function RecurringPage() {
                           3 days ago
                         </p>
                       </div>
-                      <button className="p-2 hover:bg-flourish-border rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4 text-flourish-muted" />
+                      <button
+                        onClick={() => viewTransactions(item.merchant)}
+                        title="View transactions from this merchant"
+                        className="p-2 hover:bg-flourish-border rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4 text-flourish-muted" />
                       </button>
                     </div>
                   </div>

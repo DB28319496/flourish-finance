@@ -17,7 +17,13 @@ const SECTOR_COLORS = [
 ];
 
 export default function InvestmentsPage() {
-  const { holdingGroups, benchmarks, isUsingMockData } = useData();
+  const { holdingGroups, benchmarks, isUsingMockData, accountGroups, connectBank } = useData();
+
+  // Detect investment accounts that exist but have no holdings data
+  const investmentAccountsCount = accountGroups
+    .filter((g) => g.type === 'investments')
+    .reduce((s, g) => s + g.accounts.length, 0);
+  const hasInvestmentAccountsButNoHoldings = !isUsingMockData && investmentAccountsCount > 0 && holdingGroups.length === 0;
 
   const [viewType, setViewType] = useState<ViewType>('holdings');
   const [timeframe, setTimeframe] = useState<Timeframe>('3M');
@@ -36,10 +42,16 @@ export default function InvestmentsPage() {
     return filtered.flatMap((g) => g.holdings);
   }, [holdingGroups, account]);
 
-  const totalPortfolioValue = useMemo(
-    () => allHoldings.reduce((sum, h) => sum + h.value, 0),
-    [allHoldings]
-  );
+  // Portfolio value = sum of holdings, or fallback to investment account balances
+  const totalPortfolioValue = useMemo(() => {
+    if (allHoldings.length > 0) {
+      return allHoldings.reduce((sum, h) => sum + h.value, 0);
+    }
+    // Fall back to summing investment account balances when holdings aren't available
+    return accountGroups
+      .filter((g) => g.type === 'investments')
+      .reduce((s, g) => s + g.accounts.reduce((ss, a) => ss + a.balance, 0), 0);
+  }, [allHoldings, accountGroups]);
 
   const totalCostBasis = useMemo(
     () => allHoldings.reduce((sum, h) => sum + h.costBasis, 0),
@@ -129,6 +141,31 @@ export default function InvestmentsPage() {
             options={accountOptions}
           />
         </div>
+
+        {/* Empty state: investment accounts exist but holdings endpoint fails */}
+        {hasInvestmentAccountsButNoHoldings && (
+          <Card className="p-8 mb-8 border-l-4 border-amber-400">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-display text-lg font-bold text-flourish-text mb-1">
+                  Investment data needs additional access
+                </h3>
+                <p className="font-body text-sm text-flourish-muted mb-4">
+                  We can see your {investmentAccountsCount} investment {investmentAccountsCount === 1 ? 'account' : 'accounts'} and their balances, but detailed holdings data (individual stocks, ETFs, cost basis) requires reconnecting. Your iOS app connected these with only the Transactions product — reconnecting through the web adds Investments support.
+                </p>
+                <button
+                  onClick={() => connectBank()}
+                  className="px-4 py-2 bg-flourish-orange text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Reconnect investment accounts
+                </button>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Portfolio Value Card */}
         <Card className="p-8 mb-8 animate-slide-up bg-gradient-to-br from-flourish-orange/5 to-transparent">

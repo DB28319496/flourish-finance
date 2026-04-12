@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const plaid = getPlaidClient();
     const allAccounts: any[] = [];
     const items: any[] = [];
+    const brokenItems: any[] = [];
 
     for (const token of tokens) {
       try {
@@ -61,11 +62,17 @@ export async function POST(req: NextRequest) {
           account_count: accounts.length,
         });
       } catch (err: any) {
-        console.error(`Error fetching accounts for item ${token.id}:`, err.message);
+        const errorCode = err?.response?.data?.error_code;
+        console.error(`Error fetching accounts for item ${token.id}: ${errorCode || err.message}`);
+        brokenItems.push({
+          item_id: token.id,
+          error_code: errorCode || "UNKNOWN",
+          needs_reauth: errorCode === "ITEM_LOGIN_REQUIRED" || errorCode === "ITEM_LOCKED",
+        });
       }
     }
 
-    return NextResponse.json({ accounts: allAccounts, items });
+    return NextResponse.json({ accounts: allAccounts, items, brokenItems });
   } catch (error: any) {
     console.error("Error getting all accounts:", error);
     return NextResponse.json({ error: "Failed to get accounts" }, { status: 500 });

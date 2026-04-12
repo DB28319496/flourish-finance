@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Calendar,
@@ -36,6 +36,14 @@ export default function TransactionsPage() {
 
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Pre-fill search from URL query param (e.g., /transactions?merchant=Netflix)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const merchant = params.get("merchant");
+    if (merchant) setSearchQuery(merchant);
+  }, []);
   const [transactionFilter, setTransactionFilter] = useState("All transactions");
   const [sortBy, setSortBy] = useState("Newest");
   const [gridView, setGridView] = useState(false);

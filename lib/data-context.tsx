@@ -56,6 +56,7 @@ interface DataContextType {
   accountGroups: AccountGroup[];
   transactionGroups: TransactionDateGroup[];
   linkedItems: { item_id: string; institution_name: string }[];
+  brokenItems: { item_id: string; error_code: string; needs_reauth: boolean }[];
   isLoading: boolean;
   isUsingMockData: boolean;
   error: string | null;
@@ -319,6 +320,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [accounts, setAccounts] = useState<PlaidAccount[]>([]);
   const [rawTransactions, setRawTransactions] = useState<PlaidTransaction[]>([]);
   const [linkedItems, setLinkedItems] = useState<{ item_id: string; institution_name: string }[]>([]);
+  const [brokenItems, setBrokenItems] = useState<{ item_id: string; error_code: string; needs_reauth: boolean }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [budgetTargets, setBudgetTargets] = useState<Record<string, number>>({});
@@ -419,10 +421,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [isUsingMockData, rawTransactions, accounts, recurringTransactions]
   );
 
-  // -- Investments
+  // -- Investments (only fall back to mock when truly unauthenticated)
   const holdingGroups = useMemo(
-    () => (isUsingMockData || investmentHoldings.length === 0 ? mockHoldingGroups : investmentHoldings),
-    [isUsingMockData, investmentHoldings]
+    () => (!user ? mockHoldingGroups : investmentHoldings),
+    [user, investmentHoldings]
   );
 
   const benchmarks = mockBenchmarks; // Always mock until market data API is added
@@ -472,6 +474,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const data = await apiFetch("/api/plaid/accounts", token);
       if (data.accounts) setAccounts(data.accounts);
       if (data.items) setLinkedItems(data.items);
+      if (data.brokenItems) setBrokenItems(data.brokenItems);
     } catch (err: any) {
       console.error("Failed to refresh accounts:", err);
       setError(err.message);
@@ -724,7 +727,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
   return (
     <DataContext.Provider
       value={{
-        accounts, accountGroups, transactionGroups, linkedItems,
+        accounts, accountGroups, transactionGroups, linkedItems, brokenItems,
         isLoading, isUsingMockData, error,
         refreshAccounts, refreshTransactions, connectBank, disconnectBank,
         sendChatMessage,
