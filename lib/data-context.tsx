@@ -588,12 +588,68 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .filter((a) => a.type === "credit" || a.type === "loan")
       .reduce((sum, a) => sum + (a.current_balance || 0), 0);
 
+    // Group accounts by type
+    const accountsByType: Record<string, typeof accounts> = {};
+    for (const a of accounts) {
+      const t = a.type || "other";
+      if (!accountsByType[t]) accountsByType[t] = [];
+      accountsByType[t].push(a);
+    }
+
+    // Current month spending totals by category
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonthTxs = rawTransactions.filter((t) => t.date.startsWith(currentMonth));
+    const spendByCategory: Record<string, number> = {};
+    let monthIncome = 0;
+    let monthSpending = 0;
+    for (const tx of currentMonthTxs) {
+      if (tx.amount < 0) {
+        monthIncome += Math.abs(tx.amount);
+      } else {
+        monthSpending += tx.amount;
+        const cat = tx.category?.[0] || "Other";
+        spendByCategory[cat] = (spendByCategory[cat] || 0) + tx.amount;
+      }
+    }
+
+    // Top 10 transactions by absolute amount (most impactful)
+    const topTxs = [...rawTransactions]
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+      .slice(0, 10);
+
+    const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
     const financialContext = `
-Net Worth: $${(totalAssets - totalLiabilities).toFixed(2)}
-Total Assets: $${totalAssets.toFixed(2)}
-Total Liabilities: $${totalLiabilities.toFixed(2)}
-Accounts: ${accounts.map((a) => `${a.name} (${a.type}): $${(a.current_balance || 0).toFixed(2)}`).join(", ")}
-Recent Transactions: ${rawTransactions.slice(0, 20).map((t) => `${t.date}: ${t.merchant_name || t.name} $${t.amount}`).join("; ")}
+**Net Worth Snapshot**
+- Net Worth: $${(totalAssets - totalLiabilities).toFixed(2)}
+- Total Assets: $${totalAssets.toFixed(2)}
+- Total Liabilities: $${totalLiabilities.toFixed(2)}
+- Savings Rate (${monthName}): ${monthIncome > 0 ? (((monthIncome - monthSpending) / monthIncome) * 100).toFixed(1) : "0"}%
+
+**Accounts by Type**
+${Object.entries(accountsByType).map(([type, accts]) => {
+  const total = accts.reduce((s, a) => s + (a.current_balance || 0), 0);
+  return `${type} ($${total.toFixed(2)} total):\n${accts.map((a) => `  - ${a.name}${(a as any).mask ? ` ...${(a as any).mask}` : ""}: $${(a.current_balance || 0).toFixed(2)}${(a as any).limit ? ` (limit: $${(a as any).limit})` : ""}`).join("\n")}`;
+}).join("\n\n")}
+
+**${monthName} Activity**
+- Income: $${monthIncome.toFixed(2)}
+- Spending: $${monthSpending.toFixed(2)}
+- Net: $${(monthIncome - monthSpending).toFixed(2)}
+- Transaction count: ${currentMonthTxs.length}
+
+**Top Spending Categories (${monthName})**
+${Object.entries(spendByCategory)
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 10)
+  .map(([cat, amount]) => `- ${cat}: $${amount.toFixed(2)} (${((amount / monthSpending) * 100).toFixed(1)}%)`)
+  .join("\n")}
+
+**Recent Notable Transactions**
+${topTxs.map((t) => `- ${t.date}: ${t.merchant_name || t.name} — ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)} [${t.category?.[0] || "Other"}]`).join("\n")}
+
+**Last 30 Transactions**
+${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.name} ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)}`).join("\n")}
     `.trim();
 
     const data = await apiFetch("/api/chat", token, {

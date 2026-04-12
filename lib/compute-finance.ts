@@ -259,37 +259,62 @@ export function detectRecurringTransactions(
   }
 
   const now = new Date();
+  const DAY_MS = 1000 * 60 * 60 * 24;
   const income: ComputedRecurringItem[] = [];
   const expenses: ComputedRecurringItem[] = [];
   const creditCards: ComputedRecurringItem[] = [];
 
   for (const [, txs] of Object.entries(byMerchant)) {
-    if (txs.length < 2) continue;
+    // Require 3+ occurrences for confident pattern detection
+    if (txs.length < 3) continue;
 
     // Sort by date ascending
     const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
+    const lastTx = sorted[sorted.length - 1];
+    const lastDate = new Date(lastTx.date + "T00:00:00");
 
-    // Check amount similarity (within 10% tolerance)
+    // Pattern must still be active: last occurrence within 45 days
+    const daysSinceLast = (now.getTime() - lastDate.getTime()) / DAY_MS;
+    if (daysSinceLast > 45) continue;
+
+    // Check amount similarity (within 8% tolerance — tighter)
     const amounts = sorted.map((t) => Math.abs(t.amount));
     const avgAmount = amounts.reduce((s, v) => s + v, 0) / amounts.length;
-    const allSimilar = amounts.every((a) => Math.abs(a - avgAmount) / avgAmount < 0.1);
+    // Skip tiny amounts (noise from snacks, small variable buys)
+    if (avgAmount < 5) continue;
+    const allSimilar = amounts.every((a) => Math.abs(a - avgAmount) / avgAmount < 0.08);
     if (!allSimilar) continue;
 
-    // Check interval regularity (25-35 days = monthly)
+    // Check interval regularity
     const intervals: number[] = [];
     for (let i = 1; i < sorted.length; i++) {
       const d1 = new Date(sorted[i - 1].date + "T00:00:00");
       const d2 = new Date(sorted[i].date + "T00:00:00");
-      intervals.push((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      intervals.push((d2.getTime() - d1.getTime()) / DAY_MS);
     }
     const avgInterval = intervals.reduce((s, v) => s + v, 0) / intervals.length;
-    if (avgInterval < 7 || avgInterval > 45) continue;
+    if (avgInterval < 6 || avgInterval > 45) continue;
 
-    const frequency = avgInterval <= 16 ? "Bi-weekly" : "Monthly";
-    const lastTx = sorted[sorted.length - 1];
-    const lastDate = new Date(lastTx.date + "T00:00:00");
-    const nextDate = new Date(lastDate.getTime() + avgInterval * 24 * 60 * 60 * 1000);
-    const daysUntil = Math.max(0, Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    // Interval should be consistent (not wildly varying)
+    const intervalVariance = intervals.every(
+      (i) => Math.abs(i - avgInterval) / avgInterval < 0.3
+    );
+    if (!intervalVariance) continue;
+
+    const frequency =
+      avgInterval <= 10 ? "Weekly"
+      : avgInterval <= 17 ? "Bi-weekly"
+      : "Monthly";
+
+    // Advance next date until it's in the future (handles stale patterns)
+    let nextDate = new Date(lastDate.getTime() + avgInterval * DAY_MS);
+    while (nextDate.getTime() < now.getTime() - DAY_MS) {
+      nextDate = new Date(nextDate.getTime() + avgInterval * DAY_MS);
+    }
+    const daysUntil = Math.max(
+      0,
+      Math.ceil((nextDate.getTime() - now.getTime()) / DAY_MS)
+    );
     const dayOfMonth = new Date(sorted[0].date + "T00:00:00").getDate();
 
     const isIncome = lastTx.amount < 0;
@@ -314,7 +339,7 @@ export function detectRecurringTransactions(
 
     if (isIncome) {
       income.push(item);
-    } else if (category === "Payment" || category === "Credit Card") {
+    } else if (category === "Payment" || category === "Credit Card" || category === "Transfer") {
       creditCards.push(item);
     } else {
       expenses.push(item);
