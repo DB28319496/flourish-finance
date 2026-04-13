@@ -165,6 +165,25 @@ export interface TransactionEdit {
   isFlagged?: boolean;
   isRecurring?: boolean;
   category?: string;
+  tags?: string[];
+}
+
+export interface ManualAccount {
+  id: string;
+  name: string;
+  institution?: string;
+  type: "cash" | "investments" | "creditCards" | "loans" | "property" | "crypto" | "other";
+  subtype: string;
+  balance: number;
+  notes?: string;
+  createdAt?: number;
+  lastUpdated?: number;
+}
+
+export interface BudgetTargetConfig {
+  amount: number;
+  rollover?: boolean; // if true, unused budget from prior month carries over
+  rolledOverBalance?: number; // computed balance carried from previous months
 }
 
 // ---------------------------------------------------------------------------

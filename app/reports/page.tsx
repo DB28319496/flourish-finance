@@ -32,6 +32,36 @@ export default function ReportsPage() {
     return monthlyData.slice(-months);
   }, [monthlyData, dateRange]);
 
+  // Build yearly aggregation from all transactions
+  const yearlyData = useMemo(() => {
+    const byYear: Record<string, { income: number; expenses: number }> = {};
+    for (const tx of rawTransactions) {
+      const year = tx.date.slice(0, 4);
+      if (!byYear[year]) byYear[year] = { income: 0, expenses: 0 };
+      if (tx.amount < 0) byYear[year].income += Math.abs(tx.amount);
+      else byYear[year].expenses += tx.amount;
+    }
+    return Object.entries(byYear)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([year, data]) => ({
+        month: year, // reuse 'month' field for chart X axis
+        income: Math.round(data.income * 100) / 100,
+        expenses: Math.round(data.expenses * 100) / 100,
+      }));
+  }, [rawTransactions]);
+
+  // The chart data depends on grouping
+  const chartData = grouping === 'yearly' ? yearlyData : filteredMonthly;
+
+  // YoY comparison: current year vs previous year
+  const yoyComparison = useMemo(() => {
+    if (yearlyData.length < 2) return null;
+    const [prev, curr] = yearlyData.slice(-2);
+    const incomeChange = prev.income > 0 ? ((curr.income - prev.income) / prev.income) * 100 : 0;
+    const expenseChange = prev.expenses > 0 ? ((curr.expenses - prev.expenses) / prev.expenses) * 100 : 0;
+    return { prev, curr, incomeChange, expenseChange };
+  }, [yearlyData]);
+
   // Apply filters to flatTransactions
   const filteredFlat = useMemo(() => {
     let result = flatTransactions;
@@ -160,8 +190,7 @@ export default function ReportsPage() {
                 onChange={setGrouping}
                 options={[
                   { value: 'monthly', label: 'Monthly' },
-                  { value: 'weekly', label: 'Weekly' },
-                  { value: 'daily', label: 'Daily' }
+                  { value: 'yearly', label: 'Yearly' }
                 ]}
               />
             </div>
@@ -173,7 +202,7 @@ export default function ReportsPage() {
           {/* Chart */}
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
-              data={filteredMonthly}
+              data={chartData}
               margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -192,6 +221,37 @@ export default function ReportsPage() {
             </BarChart>
           </ResponsiveContainer>
         </Card>
+
+        {/* Year-over-Year Comparison */}
+        {grouping === 'yearly' && yoyComparison && (
+          <Card className="p-6 mb-6 animate-slide-up">
+            <h3 className="font-display text-lg font-bold text-flourish-text mb-4">
+              {yoyComparison.curr.month} vs {yoyComparison.prev.month}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 rounded-xl bg-emerald-50/50">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800 mb-1">Income</p>
+                <p className="font-display text-2xl font-bold text-flourish-dark">{formatCurrency(yoyComparison.curr.income)}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className={cn('text-sm font-semibold', yoyComparison.incomeChange >= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {yoyComparison.incomeChange >= 0 ? '+' : ''}{yoyComparison.incomeChange.toFixed(1)}%
+                  </span>
+                  <span className="text-xs text-flourish-muted">vs {formatCurrency(yoyComparison.prev.income)} in {yoyComparison.prev.month}</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-red-50/50">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-800 mb-1">Expenses</p>
+                <p className="font-display text-2xl font-bold text-flourish-dark">{formatCurrency(yoyComparison.curr.expenses)}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className={cn('text-sm font-semibold', yoyComparison.expenseChange <= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {yoyComparison.expenseChange >= 0 ? '+' : ''}{yoyComparison.expenseChange.toFixed(1)}%
+                  </span>
+                  <span className="text-xs text-flourish-muted">vs {formatCurrency(yoyComparison.prev.expenses)} in {yoyComparison.prev.month}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 mb-6">

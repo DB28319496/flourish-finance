@@ -29,6 +29,7 @@ import {
   type TransactionEdit,
   type CategorizationRule,
   type TransactionSplit,
+  type ManualAccount,
 } from "./mock-data";
 import * as firestore from "./firestore-helpers";
 import {
@@ -146,6 +147,12 @@ interface DataContextType {
   splits: Record<string, TransactionSplit>;
   updateSplit: (txId: string, splits: TransactionSplit["splits"]) => Promise<void>;
   deleteSplit: (txId: string) => Promise<void>;
+
+  // Phase 4: Manual accounts
+  manualAccounts: ManualAccount[];
+  addManualAccount: (account: Omit<ManualAccount, "id" | "createdAt" | "lastUpdated">) => Promise<void>;
+  updateManualAccount: (id: string, updates: Partial<ManualAccount>) => Promise<void>;
+  deleteManualAccount: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -360,6 +367,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [netWorthSnapshots, setNetWorthSnapshots] = useState<{ date: string; value: number }[]>([]);
   const [rules, setRules] = useState<CategorizationRule[]>([]);
   const [splits, setSplits] = useState<Record<string, TransactionSplit>>({});
+  const [manualAccounts, setManualAccounts] = useState<ManualAccount[]>([]);
 
   // Use mock data if not logged in OR if logged in but no real data was fetched
   const hasRealData = accounts.length > 0 || rawTransactions.length > 0;
@@ -387,9 +395,65 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [userSettings.categoryOverrides]);
 
   // -- Account groups: full list (shown on Accounts page with hide toggles)
+  // Merges Plaid-sourced accounts with user-created manual accounts
   const accountGroups = useMemo(() => {
-    return isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
-  }, [isUsingMockData, accounts]);
+    const plaidGroups = isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
+
+    if (manualAccounts.length === 0) return plaidGroups;
+
+    // Group manual accounts by type
+    const manualByType: Record<string, ManualAccount[]> = {};
+    for (const m of manualAccounts) {
+      const t = m.type || "other";
+      if (!manualByType[t]) manualByType[t] = [];
+      manualByType[t].push(m);
+    }
+
+    // Merge into existing groups or create new ones
+    const typeMeta: Record<string, { label: string; icon: string; groupId: string }> = {
+      cash: { label: "Cash", icon: "Banknote", groupId: "depository" },
+      investments: { label: "Investments", icon: "TrendingUp", groupId: "invest" },
+      creditCards: { label: "Credit Cards", icon: "CreditCard", groupId: "credit" },
+      loans: { label: "Loans", icon: "Building2", groupId: "loan" },
+      property: { label: "Property", icon: "Home", groupId: "property" },
+      crypto: { label: "Crypto", icon: "Bitcoin", groupId: "crypto" },
+      other: { label: "Other Assets", icon: "Wallet", groupId: "other" },
+    };
+
+    const merged = [...plaidGroups];
+    for (const [type, items] of Object.entries(manualByType)) {
+      const meta = typeMeta[type] || { label: type, icon: "Wallet", groupId: type };
+      const existingGroup = merged.find((g) => g.type === (type as any) || g.id === meta.groupId);
+      const manualAsAccount = items.map((m) => ({
+        id: m.id,
+        item_id: "manual",
+        name: m.name,
+        institution: m.institution || "Manual",
+        type: m.type as any,
+        subtype: m.subtype || m.type,
+        balance: m.balance,
+        lastSyncedAt: m.lastUpdated ? new Date(m.lastUpdated).toLocaleDateString() : "Manual entry",
+        logoColor: "#E5633A",
+        monthChange: 0,
+        sparklineData: [m.balance],
+        isManual: true,
+      })) as any;
+
+      if (existingGroup) {
+        existingGroup.accounts = [...existingGroup.accounts, ...manualAsAccount];
+      } else {
+        merged.push({
+          id: meta.groupId,
+          type: (type === "crypto" || type === "property" || type === "other" ? "investments" : type) as any,
+          label: meta.label,
+          icon: meta.icon,
+          accounts: manualAsAccount,
+        } as any);
+      }
+    }
+
+    return merged;
+  }, [isUsingMockData, accounts, manualAccounts]);
 
   // -- Visible account groups: filtered for totals, charts, dashboard KPIs
   const visibleAccountGroups = useMemo(() => {
@@ -437,6 +501,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               isFlagged: edit?.isFlagged ?? rule?.setFlag ?? tx.isFlagged,
               isRecurring: edit?.isRecurring ?? rule?.setRecurring ?? tx.isRecurring,
               isTransfer,
+              tags: edit?.tags || [],
               category: { ...tx.category, name: displayCategory },
             } as any;
           }),
@@ -726,6 +791,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (user) await firestore.deleteDoc(user.uid, ["transaction_splits", txId]);
   }, [user]);
 
+  // Phase 4: Manual accounts CRUD
+  const addManualAccount = useCallback(async (account: Omit<ManualAccount, "id" | "createdAt" | "lastUpdated">) => {
+    const id = `manual_${Date.now()}`;
+    const now = Date.now();
+    const newAccount: ManualAccount = { ...account, id, createdAt: now, lastUpdated: now };
+    setManualAccounts((prev) => [...prev, newAccount]);
+    if (user) await firestore.setDoc(user.uid, ["manual_accounts", id], newAccount as any);
+  }, [user]);
+
+  const updateManualAccount = useCallback(async (id: string, updates: Partial<ManualAccount>) => {
+    const merged = { ...updates, lastUpdated: Date.now() };
+    setManualAccounts((prev) => prev.map((m) => (m.id === id ? { ...m, ...merged } : m)));
+    if (user) await firestore.setDoc(user.uid, ["manual_accounts", id], merged as any);
+  }, [user]);
+
+  const deleteManualAccount = useCallback(async (id: string) => {
+    setManualAccounts((prev) => prev.filter((m) => m.id !== id));
+    if (user) await firestore.deleteDoc(user.uid, ["manual_accounts", id]);
+  }, [user]);
+
   const sendChatMessage = useCallback(async (
     message: string,
     history: { role: string; content: string }[] = []
@@ -836,16 +921,20 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
   // Refresh all user-specific Firestore data (used after AI actions)
   const refreshAllUserData = useCallback(async () => {
     if (!user) return;
-    const [budgets, settings, userGoals, edits] = await Promise.all([
+    const [budgets, settings, userGoals, edits, userManual, userRules] = await Promise.all([
       firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
       firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
       firestore.listCollection<Goal>(user.uid, "goals"),
       firestore.listCollection<TransactionEdit & { id: string }>(user.uid, "transaction_edits"),
+      firestore.listCollection<ManualAccount>(user.uid, "manual_accounts"),
+      firestore.listCollection<CategorizationRule>(user.uid, "rules"),
     ]);
     if (budgets) setBudgetTargets(budgets);
     if (settings) setUserSettings(settings);
     setGoals(userGoals);
     setTransactionEdits(Object.fromEntries(edits.map((e) => [e.id, e as TransactionEdit])));
+    setManualAccounts(userManual);
+    setRules(userRules);
   }, [user]);
 
   // ---------------------------------------------------------------------------
@@ -861,7 +950,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
 
     // Load all user data from Firestore in parallel
     (async () => {
-      const [budgets, settings, userGoals, edits, snapshots, userRules, userSplits] = await Promise.all([
+      const [budgets, settings, userGoals, edits, snapshots, userRules, userSplits, userManual] = await Promise.all([
         firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
         firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
         firestore.listCollection<Goal>(user.uid, "goals"),
@@ -869,6 +958,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
         firestore.listCollection<{ value: number }>(user.uid, "snapshots"),
         firestore.listCollection<CategorizationRule>(user.uid, "rules"),
         firestore.listCollection<TransactionSplit>(user.uid, "transaction_splits"),
+        firestore.listCollection<ManualAccount>(user.uid, "manual_accounts"),
       ]);
 
       if (budgets) setBudgetTargets(budgets);
@@ -880,6 +970,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
       setNetWorthSnapshots(snapshots.map((s) => ({ date: s.id, value: s.value })));
       setRules(userRules);
       setSplits(Object.fromEntries(userSplits.map((s) => [s.id, s])));
+      setManualAccounts(userManual);
     })();
 
     Promise.all([refreshAccounts(), refreshTransactions(90), refreshInvestments()])
@@ -942,6 +1033,8 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
         getDisplayCategory, renameCategory,
         rules, addRule, deleteRule,
         splits, updateSplit, deleteSplit,
+        // Phase 4
+        manualAccounts, addManualAccount, updateManualAccount, deleteManualAccount,
       }}
     >
       {children}

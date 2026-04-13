@@ -59,16 +59,19 @@ export default function TransactionsPage() {
     const filtered = transactionGroups.map((group) => {
       let txs = group.transactions;
 
-      // Text search on merchant, statement, category, notes
+      // Text search on merchant, statement, category, notes, tags
       if (q) {
+        const qTrimHash = q.replace(/^#/, "");
         txs = txs.filter((t) => {
+          const tags = ((t as any).tags || []) as string[];
           return (
             t.merchantName?.toLowerCase().includes(q) ||
             t.originalStatement?.toLowerCase().includes(q) ||
             t.category.name?.toLowerCase().includes(q) ||
             t.category.group?.toLowerCase().includes(q) ||
             t.notes?.toLowerCase().includes(q) ||
-            t.accountName?.toLowerCase().includes(q)
+            t.accountName?.toLowerCase().includes(q) ||
+            tags.some((tag) => tag.toLowerCase().includes(qTrimHash))
           );
         });
       }
@@ -135,6 +138,7 @@ export default function TransactionsPage() {
         isFlagged: editingTransaction.isFlagged,
         isRecurring: editingTransaction.isRecurring,
         category: editingTransaction.category.name,
+        tags: (editingTransaction as any).tags,
       });
     }
     setSelectedTransaction(null);
@@ -312,6 +316,9 @@ export default function TransactionsPage() {
                             <Flag className="h-3 w-3" />
                           </Badge>
                         )}
+                        {((transaction as any).tags || []).slice(0, 2).map((tag: string) => (
+                          <Badge key={tag} variant="default">#{tag}</Badge>
+                        ))}
                       </div>
 
                       {/* Amount and Chevron */}
@@ -528,6 +535,12 @@ function TransactionDetailPanel({
             />
           </div>
 
+          {/* Custom Tags */}
+          <TagsEditor
+            tags={(editingTransaction as any).tags || []}
+            onChange={(tags) => onEditingChange({ ...editingTransaction, tags } as any)}
+          />
+
           {/* Tags Section - toggle buttons */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-flourish-tertiary">
@@ -691,5 +704,71 @@ function TransactionDetailPanel({
         </div>
       </div>
     </>
+  );
+}
+
+// =============================================================================
+// Tags Editor — custom tag chips on transactions
+// =============================================================================
+
+function TagsEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [value, setValue] = useState("");
+
+  const addTag = () => {
+    const t = value.trim();
+    if (!t) return;
+    if (tags.some((existing) => existing.toLowerCase() === t.toLowerCase())) {
+      setValue("");
+      return;
+    }
+    onChange([...tags, t]);
+    setValue("");
+  };
+
+  const removeTag = (tag: string) => {
+    onChange(tags.filter((t) => t !== tag));
+  };
+
+  return (
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wider text-flourish-tertiary">
+        Custom Tags
+      </label>
+      <div className="mt-2 flex flex-wrap items-center gap-2 p-2 rounded-lg border border-flourish-bg bg-flourish-card min-h-[44px]">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-flourish-orange/10 text-flourish-orange text-xs font-medium"
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              className="hover:text-red-500"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              addTag();
+            } else if (e.key === "Backspace" && !value && tags.length > 0) {
+              removeTag(tags[tags.length - 1]);
+            }
+          }}
+          placeholder={tags.length === 0 ? "Add tags (e.g., business, tax-deductible)..." : "Add more..."}
+          className="flex-1 min-w-[120px] bg-transparent text-sm text-flourish-text placeholder-flourish-tertiary outline-none"
+        />
+      </div>
+      <p className="mt-1 text-[10px] text-flourish-muted">
+        Press Enter or comma to add · Backspace to remove last
+      </p>
+    </div>
   );
 }

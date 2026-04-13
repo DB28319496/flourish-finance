@@ -59,9 +59,11 @@ function ItemMenu({ merchant, onView, onExclude }: { merchant: string; onView: (
 
 type RecurringFilter = 'monthly' | 'all';
 type TableSection = 'income' | 'expenses' | 'creditCards';
+type ViewMode = 'list' | 'calendar';
 
 export default function RecurringPage() {
   const [filter, setFilter] = useState<RecurringFilter>('monthly');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentMonth, setCurrentMonth] = useState({ month: 4, year: 2026 });
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     income: true,
@@ -178,16 +180,42 @@ export default function RecurringPage() {
               >
                 Today
               </button>
-              <button className="p-2 hover:bg-flourish-hover rounded-lg transition-colors">
-                <List className="w-5 h-5 text-flourish-text" />
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === 'list' ? 'bg-flourish-orange text-white' : 'hover:bg-flourish-hover text-flourish-text'
+                )}
+              >
+                <List className="w-5 h-5" />
               </button>
-              <button className="p-2 hover:bg-flourish-hover rounded-lg transition-colors">
-                <Calendar className="w-5 h-5 text-flourish-text" />
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  viewMode === 'calendar' ? 'bg-flourish-orange text-white' : 'hover:bg-flourish-hover text-flourish-text'
+                )}
+              >
+                <Calendar className="w-5 h-5" />
               </button>
             </div>
           </div>
         </Card>
 
+        {/* Calendar View */}
+        {viewMode === 'calendar' && (
+          <RecurringCalendar
+            year={currentMonth.year}
+            month={currentMonth.month}
+            income={incomeItems}
+            expenses={expenseItems}
+            creditCards={creditCardItems}
+            onClickItem={(item) => viewTransactions(item.merchant)}
+          />
+        )}
+
+        {/* List View (existing sections) */}
+        {viewMode === 'list' && <>
         {/* Income Section */}
         <div className="mb-8">
           <button
@@ -473,7 +501,128 @@ export default function RecurringPage() {
             </Card>
           </div>
         </div>
+        </>}
       </div>
     </div>
+  );
+}
+
+// =============================================================================
+// Calendar view component
+// =============================================================================
+
+function RecurringCalendar({
+  year,
+  month,
+  income,
+  expenses,
+  creditCards,
+  onClickItem,
+}: {
+  year: number;
+  month: number; // 1-12
+  income: any[];
+  expenses: any[];
+  creditCards: any[];
+  onClickItem: (item: any) => void;
+}) {
+  // Build all items with their day-of-month
+  const allItems = [
+    ...income.map((i) => ({ ...i, type: 'income' })),
+    ...expenses.map((e) => ({ ...e, type: 'expense' })),
+    ...creditCards.map((c) => ({ ...c, type: 'credit' })),
+  ].map((item) => {
+    // parse dueDate string "15th", "22nd" etc. or nextDate "Apr 15"
+    let day = 1;
+    if (item.dueDate) {
+      const m = String(item.dueDate).match(/\d+/);
+      if (m) day = parseInt(m[0]);
+    } else if (item.nextDate) {
+      const d = new Date(`${item.nextDate}, ${year}`);
+      if (!isNaN(d.getTime())) day = d.getDate();
+    }
+    return { ...item, day };
+  });
+
+  // Group by day
+  const byDay: Record<number, any[]> = {};
+  for (const item of allItems) {
+    if (!byDay[item.day]) byDay[item.day] = [];
+    byDay[item.day].push(item);
+  }
+
+  // Build calendar grid
+  const firstDay = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startOffset = firstDay.getDay();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const today = new Date();
+  const todayMonth = today.getMonth() + 1;
+  const todayDate = today.getDate();
+  const todayYear = today.getFullYear();
+
+  return (
+    <Card className="p-6 animate-slide-up">
+      {/* Weekday header */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+          <div key={d} className="text-center text-xs font-semibold uppercase tracking-wider text-flourish-muted py-2">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Days */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, idx) => {
+          if (d === null) return <div key={`empty-${idx}`} />;
+          const items = byDay[d] || [];
+          const isToday = d === todayDate && month === todayMonth && year === todayYear;
+          return (
+            <div
+              key={d}
+              className={cn(
+                "min-h-[90px] p-2 rounded-lg border transition-colors",
+                isToday ? 'border-flourish-orange bg-flourish-orange/5' : 'border-flourish-border hover:bg-flourish-hover/50'
+              )}
+            >
+              <div className={cn("text-xs font-semibold mb-1", isToday ? 'text-flourish-orange' : 'text-flourish-dark')}>
+                {d}
+              </div>
+              <div className="space-y-1">
+                {items.slice(0, 3).map((item, i) => {
+                  const color = item.type === 'income' ? 'bg-emerald-100 text-emerald-800'
+                    : item.type === 'credit' ? 'bg-red-100 text-red-800'
+                    : 'bg-flourish-orange/20 text-flourish-orange';
+                  return (
+                    <button
+                      key={`${item.merchant}-${i}`}
+                      onClick={() => onClickItem(item)}
+                      className={cn("w-full px-1.5 py-0.5 rounded text-[10px] font-medium text-left truncate", color)}
+                      title={`${item.merchant} - $${item.amount}`}
+                    >
+                      {item.emoji} {item.merchant}
+                    </button>
+                  );
+                })}
+                {items.length > 3 && (
+                  <div className="text-[10px] text-flourish-muted">+{items.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex items-center gap-4 text-xs text-flourish-muted">
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" /> Income</div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-flourish-orange/20 border border-flourish-orange/50" /> Expense</div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-100 border border-red-300" /> Credit Card</div>
+      </div>
+    </Card>
   );
 }

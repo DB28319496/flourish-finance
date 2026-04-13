@@ -25,6 +25,8 @@ import {
   ProgressBar,
 } from "@/components/ui";
 import { AccountDetailDrawer } from "@/components/account-detail-drawer";
+import { ManualAccountModal } from "@/components/manual-account-modal";
+import type { ManualAccount } from "@/lib/mock-data";
 import {
   formatCurrency,
 } from "@/lib/mock-data";
@@ -64,9 +66,21 @@ function formatLastSynced(timeStr: string): string {
 }
 
 export default function AccountsPage() {
-  const { accountGroups, netWorthTimeline, hiddenAccountIds, toggleAccountHidden, isLoading, isUsingMockData } = useData();
+  const {
+    accountGroups,
+    netWorthTimeline,
+    hiddenAccountIds,
+    toggleAccountHidden,
+    manualAccounts,
+    addManualAccount,
+    updateManualAccount,
+    deleteManualAccount,
+    isLoading,
+    isUsingMockData,
+  } = useData();
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [manualAccountModal, setManualAccountModal] = useState<ManualAccount | null | 'new'>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
   );
@@ -106,7 +120,15 @@ export default function AccountsPage() {
             {isUsingMockData ? "Viewing demo data — sign in to connect your banks" : "Manage all your connected accounts"}
           </p>
         </div>
-        <PlaidLinkButton />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setManualAccountModal('new')}
+            className="px-4 py-2.5 rounded-xl border border-flourish-border text-sm font-medium text-flourish-dark hover:bg-flourish-hover transition-colors"
+          >
+            + Add Manual
+          </button>
+          <PlaidLinkButton />
+        </div>
       </div>
 
       {/* Net Worth Header Card */}
@@ -240,12 +262,20 @@ export default function AccountsPage() {
                         : 0;
 
                     const isHidden = hiddenAccountIds.has(account.id);
+                    const isManual = (account as any).isManual;
+                    const manualData = isManual ? manualAccounts.find((m) => m.id === account.id) : null;
                     return (
                       <Card
                         key={account.id}
                         hover
                         className={cn("p-4 cursor-pointer", isHidden && "opacity-60")}
-                        onClick={() => setSelectedAccountId(account.id)}
+                        onClick={() => {
+                          if (isManual && manualData) {
+                            setManualAccountModal(manualData);
+                          } else {
+                            setSelectedAccountId(account.id);
+                          }
+                        }}
                       >
                         <div className="flex items-center gap-3">
                           {/* Account Initial Circle */}
@@ -258,9 +288,14 @@ export default function AccountsPage() {
 
                           {/* Account Info */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-flourish-text truncate">
-                              {account.name}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-flourish-text truncate">
+                                {account.name}
+                              </p>
+                              {isManual && (
+                                <span className="text-[9px] font-semibold uppercase tracking-wider text-flourish-orange bg-flourish-orange/10 px-1.5 py-0.5 rounded">Manual</span>
+                              )}
+                            </div>
                             <p className="text-xs text-flourish-secondary truncate">
                               {account.subtype}
                             </p>
@@ -441,6 +476,24 @@ export default function AccountsPage() {
         accountName=""
         onClose={() => setSelectedAccountId(null)}
       />
+
+      {/* Manual Account Modal */}
+      {manualAccountModal && (
+        <ManualAccountModal
+          initial={manualAccountModal === 'new' ? null : manualAccountModal}
+          onSave={async (data) => {
+            if (manualAccountModal === 'new') {
+              await addManualAccount(data);
+            } else {
+              await updateManualAccount(manualAccountModal.id, data);
+            }
+          }}
+          onDelete={manualAccountModal !== 'new' ? async () => {
+            await deleteManualAccount((manualAccountModal as ManualAccount).id);
+          } : undefined}
+          onClose={() => setManualAccountModal(null)}
+        />
+      )}
     </div>
   );
 }
