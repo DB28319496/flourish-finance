@@ -362,29 +362,62 @@ export default function InvestmentsPage() {
         {/* Allocation View */}
         {viewType === 'allocation' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Pie Chart */}
+            {/* Donut Chart with center label */}
             <Card className="p-6">
               <h3 className="font-display text-lg font-bold text-flourish-text mb-4">Asset Allocation</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={allocationData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={110}
-                    innerRadius={60}
-                    paddingAngle={2}
-                    label={({ name, pct }) => `${name} ${pct}%`}
-                  >
-                    {allocationData.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={allocationData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={120}
+                      innerRadius={80}
+                      paddingAngle={2}
+                      stroke="#fff"
+                      strokeWidth={2}
+                    >
+                      {allocationData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, _name, entry: any) => [
+                        `${formatCurrency(value)} (${entry?.payload?.pct}%)`,
+                        entry?.payload?.name || ''
+                      ]}
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        padding: '8px 12px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p className="text-xs text-flourish-muted uppercase tracking-wider">Total</p>
+                  <p className="font-display text-xl font-bold text-flourish-dark">
+                    {formatCurrency(allocationData.reduce((s, d) => s + d.value, 0))}
+                  </p>
+                  <p className="text-xs text-flourish-muted">{allocationData.length} {allocationData.length === 1 ? 'position' : 'positions'}</p>
+                </div>
+              </div>
+
+              {/* Legend below chart */}
+              <div className="mt-4 space-y-1.5">
+                {allocationData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2 text-sm">
+                    <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-flourish-dark truncate flex-1" title={item.name}>{item.name}</span>
+                    <span className="text-flourish-muted tabular-nums">{item.pct}%</span>
+                  </div>
+                ))}
+              </div>
             </Card>
 
             {/* Allocation Table */}
