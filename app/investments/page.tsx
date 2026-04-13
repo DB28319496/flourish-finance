@@ -79,31 +79,65 @@ export default function InvestmentsPage() {
     };
   }, [allHoldings]);
 
-  // Allocation data for pie chart
+  // Allocation data for pie chart — fall back to per-account breakdown
+  // when holdings aren't available (Plaid investments consent missing)
   const allocationData = useMemo(() => {
-    const totalValue = allHoldings.reduce((s, h) => s + h.value, 0) || 1;
-    return allHoldings
-      .sort((a, b) => b.value - a.value)
-      .map((h, i) => ({
-        name: h.ticker,
-        value: Math.round(h.value * 100) / 100,
-        pct: Math.round((h.value / totalValue) * 1000) / 10,
+    // Preferred: holding-level allocation (ticker by ticker)
+    if (allHoldings.length > 0) {
+      const totalValue = allHoldings.reduce((s, h) => s + h.value, 0) || 1;
+      return allHoldings
+        .sort((a, b) => b.value - a.value)
+        .map((h, i) => ({
+          name: h.ticker,
+          value: Math.round(h.value * 100) / 100,
+          pct: Math.round((h.value / totalValue) * 1000) / 10,
+          color: SECTOR_COLORS[i % SECTOR_COLORS.length],
+        }));
+    }
+    // Fallback: per-account allocation from investment account balances
+    const investmentAccounts = accountGroups
+      .filter((g) => g.type === 'investments')
+      .flatMap((g) => g.accounts);
+    const totalValue = investmentAccounts.reduce((s, a) => s + a.balance, 0) || 1;
+    return investmentAccounts
+      .filter((a) => a.balance > 0)
+      .sort((a, b) => b.balance - a.balance)
+      .map((a, i) => ({
+        name: a.name,
+        value: Math.round(a.balance * 100) / 100,
+        pct: Math.round((a.balance / totalValue) * 1000) / 10,
         color: SECTOR_COLORS[i % SECTOR_COLORS.length],
       }));
-  }, [allHoldings]);
+  }, [allHoldings, accountGroups]);
 
   // Concentration risk warnings
   const riskWarnings = useMemo(() => {
     const warnings: string[] = [];
-    const totalVal = allHoldings.reduce((s, h) => s + h.value, 0) || 1;
-    for (const h of allHoldings) {
-      const pct = (h.value / totalVal) * 100;
-      if (pct > 25) {
-        warnings.push(`${h.ticker} is ${pct.toFixed(1)}% of your portfolio — consider diversifying`);
+    if (allHoldings.length > 0) {
+      const totalVal = allHoldings.reduce((s, h) => s + h.value, 0) || 1;
+      for (const h of allHoldings) {
+        const pct = (h.value / totalVal) * 100;
+        if (pct > 25) {
+          warnings.push(`${h.ticker} is ${pct.toFixed(1)}% of your portfolio — consider diversifying`);
+        }
+      }
+    } else {
+      // Account-level concentration from real investment account balances
+      const invAccounts = accountGroups
+        .filter((g) => g.type === 'investments')
+        .flatMap((g) => g.accounts);
+      const total = invAccounts.reduce((s, a) => s + a.balance, 0);
+      if (total > 0) {
+        for (const a of invAccounts) {
+          const pct = (a.balance / total) * 100;
+          if (pct > 50) {
+            warnings.push(`${pct.toFixed(0)}% of your investments are in ${a.name} — reconnect with investments product for holding-level analysis`);
+          }
+        }
       }
     }
     return warnings;
-  }, [allHoldings]);
+  }, [allHoldings, accountGroups]);
 
   // Performance chart data (mock, as we'd need historical data)
   const performanceChartData = useMemo(() => {
