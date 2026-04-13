@@ -7,6 +7,78 @@
  */
 
 import type { PlaidAccount, PlaidTransaction } from "./plaid-service";
+
+// ---------------------------------------------------------------------------
+// Transfer Detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a Set of transaction IDs that look like transfers between the
+ * user's own accounts. These should be excluded from cash flow / budget
+ * calculations since they don't represent real income or spending.
+ *
+ * Detection:
+ *   1. Any transaction whose Plaid category starts with "Transfer",
+ *      "Payment" (credit card payment), or "Credit Card"
+ *   2. Amount-match pairs: two transactions in different accounts within
+ *      3 days with the same absolute amount and opposite signs
+ */
+export function detectTransfers(transactions: PlaidTransaction[]): Set<string> {
+  const transferIds = new Set<string>();
+
+  // 1. Category-based
+  const TRANSFER_CATEGORIES = new Set([
+    "Transfer", "Payment", "Credit Card", "Credit Card Payment",
+    "Internal Account Transfer", "Debit", "Deposit", "Withdrawal",
+    "Account Transfer",
+  ]);
+  for (const tx of transactions) {
+    const top = tx.category?.[0] || "";
+    const sub = tx.category?.[1] || "";
+    const pfc = (tx as any).personal_finance_category?.primary || "";
+    if (
+      TRANSFER_CATEGORIES.has(top) ||
+      TRANSFER_CATEGORIES.has(sub) ||
+      pfc === "TRANSFER_IN" ||
+      pfc === "TRANSFER_OUT" ||
+      pfc === "LOAN_PAYMENTS"
+    ) {
+      transferIds.add(tx.transaction_id);
+      continue;
+    }
+    const name = (tx.name || "").toLowerCase();
+    if (
+      name.includes("transfer") ||
+      name.includes("autopay") ||
+      (name.includes("payment") && (name.includes("credit") || name.includes("card")))
+    ) {
+      transferIds.add(tx.transaction_id);
+    }
+  }
+
+  // 2. Amount-match pairs between different accounts within 3 days
+  const unmatched = transactions.filter((tx) => !transferIds.has(tx.transaction_id));
+  const DAY_MS = 1000 * 60 * 60 * 24;
+  for (let i = 0; i < unmatched.length; i++) {
+    const a = unmatched[i];
+    if (transferIds.has(a.transaction_id)) continue;
+    for (let j = i + 1; j < unmatched.length; j++) {
+      const b = unmatched[j];
+      if (transferIds.has(b.transaction_id)) continue;
+      if (a.account_id === b.account_id) continue;
+      if (Math.abs(a.amount + b.amount) > 0.01) continue; // must be opposite signs, same magnitude
+      if (Math.abs(a.amount) < 50) continue; // skip tiny matches (coincidental)
+      const dateA = new Date(a.date + "T00:00:00").getTime();
+      const dateB = new Date(b.date + "T00:00:00").getTime();
+      if (Math.abs(dateA - dateB) > 3 * DAY_MS) continue;
+      transferIds.add(a.transaction_id);
+      transferIds.add(b.transaction_id);
+      break;
+    }
+  }
+
+  return transferIds;
+}
 import type {
   CashFlowMonth,
   CashFlowBreakdown,
@@ -56,11 +128,13 @@ function getMonthLabel(monthKey: string): string {
 
 export function computeCashFlowMonths(
   transactions: PlaidTransaction[],
-  numMonths = 6
+  numMonths = 6,
+  transferIds?: Set<string>
 ): CashFlowMonth[] {
   const monthly: Record<string, { income: number; expenses: number }> = {};
 
   for (const tx of transactions) {
+    if (transferIds?.has(tx.transaction_id)) continue;
     const key = getMonthKey(tx.date);
     if (!monthly[key]) monthly[key] = { income: 0, expenses: 0 };
     if (tx.amount < 0) {
@@ -87,11 +161,15 @@ export function computeCashFlowMonths(
 
 export function computeExpenseBreakdown(
   transactions: PlaidTransaction[],
-  monthKey?: string
+  monthKey?: string,
+  transferIds?: Set<string>
 ): CashFlowBreakdown[] {
   const targetMonth = monthKey || getCurrentMonthKey();
   const expenses = transactions.filter(
-    (tx) => tx.amount > 0 && getMonthKey(tx.date) === targetMonth
+    (tx) =>
+      tx.amount > 0 &&
+      getMonthKey(tx.date) === targetMonth &&
+      !transferIds?.has(tx.transaction_id)
   );
 
   const byCategory: Record<string, number> = {};
@@ -116,11 +194,15 @@ export function computeExpenseBreakdown(
 
 export function computeIncomeBreakdown(
   transactions: PlaidTransaction[],
-  monthKey?: string
+  monthKey?: string,
+  transferIds?: Set<string>
 ): CashFlowBreakdown[] {
   const targetMonth = monthKey || getCurrentMonthKey();
   const income = transactions.filter(
-    (tx) => tx.amount < 0 && getMonthKey(tx.date) === targetMonth
+    (tx) =>
+      tx.amount < 0 &&
+      getMonthKey(tx.date) === targetMonth &&
+      !transferIds?.has(tx.transaction_id)
   );
 
   const bySource: Record<string, number> = {};
@@ -154,11 +236,13 @@ function getCurrentMonthKey(): string {
 
 export function computeMonthlyTotals(
   transactions: PlaidTransaction[],
-  numMonths = 6
+  numMonths = 6,
+  transferIds?: Set<string>
 ): { month: string; income: number; expenses: number }[] {
   const monthly: Record<string, { income: number; expenses: number }> = {};
 
   for (const tx of transactions) {
+    if (transferIds?.has(tx.transaction_id)) continue;
     const key = getMonthKey(tx.date);
     if (!monthly[key]) monthly[key] = { income: 0, expenses: 0 };
     if (tx.amount < 0) {
@@ -367,13 +451,15 @@ function getOrdinal(n: number): string {
 
 export function computeActualSpending(
   transactions: PlaidTransaction[],
-  monthKey?: string
+  monthKey?: string,
+  transferIds?: Set<string>
 ): Record<string, number> {
   const targetMonth = monthKey || getCurrentMonthKey();
   const result: Record<string, number> = {};
 
   for (const tx of transactions) {
     if (getMonthKey(tx.date) !== targetMonth) continue;
+    if (transferIds?.has(tx.transaction_id)) continue;
     const cat = tx.category?.[1] || tx.category?.[0] || "Other";
     const normalizedCat = cat.toLowerCase().replace(/\s+/g, "-");
     if (tx.amount > 0) {

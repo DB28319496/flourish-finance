@@ -32,7 +32,7 @@ type FilterTab = "All" | "Receipts";
 // =============================================================================
 
 export default function TransactionsPage() {
-  const { transactionGroups, updateTransaction } = useData();
+  const { transactionGroups, updateTransaction, markAsTransfer, transferIds, splits, updateSplit, deleteSplit } = useData();
 
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -335,8 +335,13 @@ export default function TransactionsPage() {
         <TransactionDetailPanel
           transaction={selectedTransaction}
           editingTransaction={editingTransaction}
+          isTransfer={transferIds.has(selectedTransaction.id)}
+          existingSplit={splits[selectedTransaction.id]}
           onSave={handleSaveTransaction}
           onDelete={handleDeleteTransaction}
+          onToggleTransfer={(flag) => markAsTransfer(selectedTransaction.id, flag)}
+          onSaveSplit={(list) => updateSplit(selectedTransaction.id, list)}
+          onDeleteSplit={() => deleteSplit(selectedTransaction.id)}
           onClose={() => {
             setSelectedTransaction(null);
             setEditingTransaction(null);
@@ -355,8 +360,13 @@ export default function TransactionsPage() {
 interface TransactionDetailPanelProps {
   transaction: Transaction;
   editingTransaction: Transaction;
+  isTransfer: boolean;
+  existingSplit?: { id: string; splits: { category: string; amount: number; notes?: string }[] };
   onSave: () => void;
   onDelete: () => void;
+  onToggleTransfer: (isTransfer: boolean) => Promise<void>;
+  onSaveSplit: (splits: { category: string; amount: number; notes?: string }[]) => Promise<void>;
+  onDeleteSplit: () => Promise<void>;
   onClose: () => void;
   onEditingChange: (transaction: Transaction) => void;
 }
@@ -364,12 +374,27 @@ interface TransactionDetailPanelProps {
 function TransactionDetailPanel({
   transaction,
   editingTransaction,
+  isTransfer,
+  existingSplit,
   onSave,
   onDelete,
+  onToggleTransfer,
+  onSaveSplit,
+  onDeleteSplit,
   onClose,
   onEditingChange,
 }: TransactionDetailPanelProps) {
   const merchantColor = getMerchantColor(transaction.merchantName);
+  const [showSplit, setShowSplit] = useState(!!existingSplit);
+  const [splitRows, setSplitRows] = useState<{ category: string; amount: number; notes?: string }[]>(
+    existingSplit?.splits || [
+      { category: transaction.category.name, amount: transaction.amount / 2 },
+      { category: "", amount: transaction.amount / 2 },
+    ]
+  );
+
+  const splitTotal = splitRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const splitValid = Math.abs(splitTotal - transaction.amount) < 0.01 && splitRows.every((r) => r.category.trim() !== "");
 
   return (
     <>
@@ -503,40 +528,158 @@ function TransactionDetailPanel({
             />
           </div>
 
-          {/* Tags Section */}
+          {/* Tags Section - toggle buttons */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-flourish-tertiary">
               Tags
             </label>
             <div className="mt-2 flex flex-wrap gap-2">
-              {transaction.isFlagged && (
-                <Badge variant="danger">
-                  <Flag className="h-3 w-3" />
-                  Flagged
-                </Badge>
-              )}
-              {transaction.isRecurring && (
-                <Badge variant="default">
-                  <Repeat className="h-3 w-3" />
-                  Recurring
-                </Badge>
-              )}
+              <button
+                onClick={() => onEditingChange({ ...editingTransaction, isFlagged: !editingTransaction.isFlagged })}
+                className={cn(
+                  "inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                  editingTransaction.isFlagged
+                    ? "bg-red-50 text-flourish-red border border-red-200"
+                    : "bg-flourish-bg text-flourish-secondary border border-transparent hover:bg-red-50 hover:text-flourish-red"
+                )}
+              >
+                <Flag className="h-3 w-3" />
+                {editingTransaction.isFlagged ? "Flagged" : "Flag"}
+              </button>
+              <button
+                onClick={() => onEditingChange({ ...editingTransaction, isRecurring: !editingTransaction.isRecurring })}
+                className={cn(
+                  "inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                  editingTransaction.isRecurring
+                    ? "bg-flourish-bg text-flourish-text border border-flourish-border"
+                    : "bg-flourish-bg text-flourish-secondary border border-transparent hover:text-flourish-text"
+                )}
+              >
+                <Repeat className="h-3 w-3" />
+                {editingTransaction.isRecurring ? "Recurring" : "Mark recurring"}
+              </button>
               {transaction.isPending && (
                 <Badge variant="warning">
                   <Clock className="h-3 w-3" />
                   Pending
                 </Badge>
               )}
+              {(transaction as any).isTransfer && (
+                <Badge variant="default">
+                  ↔ Transfer
+                </Badge>
+              )}
             </div>
           </div>
 
-          {/* Delete Button */}
-          <button
-            onClick={onDelete}
-            className="w-full rounded-lg bg-red-50 py-2 text-sm font-medium text-flourish-red transition-colors hover:bg-red-100"
-          >
-            Delete Transaction
-          </button>
+          {/* Transfer toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-flourish-bg">
+            <div>
+              <p className="text-sm font-medium text-flourish-dark">Mark as transfer</p>
+              <p className="text-xs text-flourish-secondary">Transfers don't count as income or expense</p>
+            </div>
+            <button
+              onClick={() => onToggleTransfer(!isTransfer)}
+              className={cn(
+                "relative w-11 h-6 rounded-full transition-colors",
+                isTransfer ? "bg-flourish-orange" : "bg-gray-300"
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  isTransfer && "translate-x-5"
+                )}
+              />
+            </button>
+          </div>
+
+          {/* Split section */}
+          <div className="border border-flourish-border rounded-lg">
+            <button
+              onClick={() => setShowSplit(!showSplit)}
+              className="w-full flex items-center justify-between px-3 py-3"
+            >
+              <div className="text-left">
+                <p className="text-sm font-medium text-flourish-dark">Split transaction</p>
+                <p className="text-xs text-flourish-secondary">
+                  {existingSplit ? `${existingSplit.splits.length} splits saved` : 'Divide across multiple categories'}
+                </p>
+              </div>
+              <ChevronRight
+                size={16}
+                className={cn("text-flourish-secondary transition-transform", showSplit && "rotate-90")}
+              />
+            </button>
+
+            {showSplit && (
+              <div className="px-3 pb-3 space-y-2 border-t border-flourish-border pt-3">
+                {splitRows.map((row, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      value={row.category}
+                      onChange={(e) => {
+                        const next = [...splitRows];
+                        next[idx] = { ...next[idx], category: e.target.value };
+                        setSplitRows(next);
+                      }}
+                      placeholder="Category"
+                      className="flex-1 px-2 py-1.5 border border-flourish-border rounded-md text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={row.amount}
+                      onChange={(e) => {
+                        const next = [...splitRows];
+                        next[idx] = { ...next[idx], amount: parseFloat(e.target.value) || 0 };
+                        setSplitRows(next);
+                      }}
+                      className="w-24 px-2 py-1.5 border border-flourish-border rounded-md text-sm text-right"
+                    />
+                    <button
+                      onClick={() => setSplitRows(splitRows.filter((_, i) => i !== idx))}
+                      disabled={splitRows.length <= 2}
+                      className="p-1 text-flourish-secondary hover:text-red-500 disabled:opacity-30"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setSplitRows([...splitRows, { category: "", amount: 0 }])}
+                  className="text-xs font-medium text-flourish-orange hover:underline"
+                >
+                  + Add row
+                </button>
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-flourish-border">
+                  <span className="text-flourish-secondary">Total of splits:</span>
+                  <span className={cn("font-semibold tabular-nums", splitValid ? "text-flourish-green" : "text-flourish-red")}>
+                    {formatCurrency(splitTotal)} / {formatCurrency(transaction.amount)}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      if (splitValid) await onSaveSplit(splitRows);
+                    }}
+                    disabled={!splitValid}
+                    className="flex-1 py-2 text-xs font-semibold text-white bg-flourish-orange rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    Save split
+                  </button>
+                  {existingSplit && (
+                    <button
+                      onClick={async () => { await onDeleteSplit(); setShowSplit(false); }}
+                      className="px-3 py-2 text-xs font-medium text-flourish-red border border-red-200 rounded-lg hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Save Button */}
           <button

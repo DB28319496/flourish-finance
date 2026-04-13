@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const {
     accounts,
-    accountGroups,
+    visibleAccountGroups: accountGroups,
     transactionGroups,
     netWorthTimeline,
     expensesByCategory,

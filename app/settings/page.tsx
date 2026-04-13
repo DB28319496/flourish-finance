@@ -1,22 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Bell, Shield, Palette, CreditCard, Link2, LogOut } from 'lucide-react';
+import { User, Bell, Shield, Palette, CreditCard, Link2, LogOut, Tag, Wand2, Trash2, Plus } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { cn } from '@/lib/utils';
 
-type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance' | 'billing' | 'connections';
+type SettingsTab = 'profile' | 'notifications' | 'categories' | 'rules' | 'security' | 'appearance' | 'billing' | 'connections';
 
 const tabs = [
   { id: 'profile' as const, label: 'Profile', icon: User },
+  { id: 'categories' as const, label: 'Categories', icon: Tag },
+  { id: 'rules' as const, label: 'Rules', icon: Wand2 },
   { id: 'notifications' as const, label: 'Notifications', icon: Bell },
-  { id: 'security' as const, label: 'Security', icon: Shield },
-  { id: 'appearance' as const, label: 'Appearance', icon: Palette },
-  { id: 'billing' as const, label: 'Billing', icon: CreditCard },
   { id: 'connections' as const, label: 'Connections', icon: Link2 },
+  { id: 'appearance' as const, label: 'Appearance', icon: Palette },
+  { id: 'security' as const, label: 'Security', icon: Shield },
+  { id: 'billing' as const, label: 'Billing', icon: CreditCard },
 ];
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
@@ -40,7 +42,12 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const { userSettings, updateUserSetting, linkedItems, brokenItems, accountGroups, disconnectBank, connectBank } = useData();
+  const {
+    userSettings, updateUserSetting,
+    linkedItems, brokenItems, accountGroups, disconnectBank, connectBank,
+    rawTransactions, renameCategory,
+    rules, addRule, deleteRule,
+  } = useData();
   const { user, signOut } = useAuth();
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
@@ -148,6 +155,18 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </Card>
+            )}
+
+            {activeTab === 'categories' && (
+              <CategoriesTab
+                rawTransactions={rawTransactions}
+                overrides={userSettings.categoryOverrides || {}}
+                onRename={renameCategory}
+              />
+            )}
+
+            {activeTab === 'rules' && (
+              <RulesTab rules={rules} onAdd={addRule} onDelete={deleteRule} />
             )}
 
             {activeTab === 'notifications' && (
@@ -363,5 +382,217 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ================================================================
+// Categories Tab — rename top-level Plaid categories
+// ================================================================
+
+function CategoriesTab({
+  rawTransactions,
+  overrides,
+  onRename,
+}: {
+  rawTransactions: any[];
+  overrides: Record<string, string>;
+  onRename: (raw: string, newName: string) => Promise<void>;
+}) {
+  // Build unique list of Plaid top-level categories present in user data
+  const uniqueCategories = Array.from(
+    new Set(rawTransactions.map((t) => t.category?.[0] || 'Other'))
+  ).sort();
+
+  const [editing, setEditing] = useState<string | null>(null);
+  const [value, setValue] = useState('');
+
+  const save = async (raw: string) => {
+    await onRename(raw, value);
+    setEditing(null);
+    setValue('');
+  };
+
+  return (
+    <Card className="p-8 animate-slide-up">
+      <h2 className="font-display text-xl font-bold text-flourish-text mb-2">Categories</h2>
+      <p className="text-sm text-flourish-secondary mb-6">
+        Rename any auto-detected category to match how you think about your money. Renames apply everywhere in the app instantly.
+      </p>
+
+      {uniqueCategories.length === 0 ? (
+        <p className="text-sm text-flourish-muted">No transactions yet — sign in and connect accounts to see categories.</p>
+      ) : (
+        <div className="space-y-2">
+          {uniqueCategories.map((cat) => {
+            const display = overrides[cat] || cat;
+            const isRenamed = overrides[cat] && overrides[cat] !== cat;
+            const isEditing = editing === cat;
+
+            return (
+              <div key={cat} className="flex items-center gap-3 p-3 rounded-xl bg-flourish-hover/30 hover:bg-flourish-hover transition-colors">
+                <Tag className="w-4 h-4 text-flourish-secondary flex-shrink-0" />
+
+                {isEditing ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') save(cat);
+                        if (e.key === 'Escape') { setEditing(null); setValue(''); }
+                      }}
+                      placeholder={cat}
+                      className="flex-1 px-3 py-1.5 border border-flourish-orange rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-flourish-orange/30"
+                    />
+                    <button
+                      onClick={() => save(cat)}
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-flourish-orange rounded-lg hover:bg-orange-600"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setEditing(null); setValue(''); }}
+                      className="px-3 py-1.5 text-xs font-medium text-flourish-secondary hover:text-flourish-dark"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-flourish-dark truncate">{display}</p>
+                      {isRenamed && (
+                        <p className="text-xs text-flourish-secondary truncate">(originally: {cat})</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setEditing(cat); setValue(display); }}
+                      className="text-xs font-medium text-flourish-orange hover:underline"
+                    >
+                      Rename
+                    </button>
+                    {isRenamed && (
+                      <button
+                        onClick={() => onRename(cat, cat)}
+                        className="text-xs font-medium text-flourish-secondary hover:text-red-500"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ================================================================
+// Rules Tab — auto-categorize by merchant pattern
+// ================================================================
+
+function RulesTab({
+  rules,
+  onAdd,
+  onDelete,
+}: {
+  rules: any[];
+  onAdd: (rule: any) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [pattern, setPattern] = useState('');
+  const [category, setCategory] = useState('');
+  const [recurring, setRecurring] = useState(false);
+
+  const create = async () => {
+    if (!pattern.trim()) return;
+    await onAdd({
+      merchantPattern: pattern.trim(),
+      setCategory: category.trim() || undefined,
+      setRecurring: recurring || undefined,
+    });
+    setPattern(''); setCategory(''); setRecurring(false);
+  };
+
+  return (
+    <Card className="p-8 animate-slide-up">
+      <h2 className="font-display text-xl font-bold text-flourish-text mb-2">Categorization Rules</h2>
+      <p className="text-sm text-flourish-secondary mb-6">
+        Auto-apply changes to transactions based on merchant name patterns. Rules run every time the app displays a transaction.
+      </p>
+
+      {/* Create rule form */}
+      <div className="p-4 bg-[#fdf8f4] rounded-xl border border-flourish-border mb-6">
+        <p className="text-sm font-semibold text-flourish-dark mb-3">New rule</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-flourish-muted mb-1">When merchant contains</label>
+            <input
+              value={pattern}
+              onChange={(e) => setPattern(e.target.value)}
+              placeholder="e.g. Starbucks"
+              className="w-full px-3 py-2 border border-flourish-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-flourish-muted mb-1">Set category to</label>
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Coffee"
+              className="w-full px-3 py-2 border border-flourish-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-flourish-dark">
+            <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+            Mark as recurring
+          </label>
+          <button
+            onClick={create}
+            disabled={!pattern.trim()}
+            className="ml-auto flex items-center gap-1 px-4 py-2 bg-flourish-orange text-white text-sm font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-50"
+          >
+            <Plus size={14} /> Add rule
+          </button>
+        </div>
+      </div>
+
+      {/* Existing rules list */}
+      {rules.length === 0 ? (
+        <p className="text-sm text-flourish-muted text-center py-4">No rules yet. Create one above to auto-categorize transactions.</p>
+      ) : (
+        <div className="space-y-2">
+          {rules.map((rule) => (
+            <div key={rule.id} className="flex items-center gap-3 p-3 rounded-xl bg-flourish-hover/30">
+              <Wand2 className="w-4 h-4 text-flourish-orange flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-flourish-dark">
+                  When merchant contains <span className="font-semibold">"{rule.merchantPattern}"</span>
+                </p>
+                <p className="text-xs text-flourish-secondary">
+                  {[
+                    rule.setCategory && `→ set category to "${rule.setCategory}"`,
+                    rule.setRecurring && '→ mark as recurring',
+                    rule.setFlag && '→ flag',
+                  ].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <button
+                onClick={() => onDelete(rule.id)}
+                className="p-2 rounded-lg text-flourish-secondary hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

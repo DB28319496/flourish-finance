@@ -27,6 +27,8 @@ import {
   type Goal,
   type UserSettings,
   type TransactionEdit,
+  type CategorizationRule,
+  type TransactionSplit,
 } from "./mock-data";
 import * as firestore from "./firestore-helpers";
 import {
@@ -40,6 +42,7 @@ import {
   computeActualSpending,
   generateInsights,
   generateNotifications,
+  detectTransfers,
   type TransactionStats,
   type ComputedRecurringItem,
   type ComputedInsight,
@@ -54,6 +57,7 @@ interface DataContextType {
   // Existing
   accounts: PlaidAccount[];
   accountGroups: AccountGroup[];
+  visibleAccountGroups: AccountGroup[];
   transactionGroups: TransactionDateGroup[];
   rawTransactions: PlaidTransaction[];
   linkedItems: { item_id: string; institution_name: string }[];
@@ -120,6 +124,28 @@ interface DataContextType {
 
   // Net worth timeline
   netWorthTimeline: { date: string; value: number }[];
+
+  // Phase 1: Transfer detection
+  transferIds: Set<string>;
+  markAsTransfer: (transactionId: string, isTransfer: boolean) => Promise<void>;
+
+  // Phase 1: Hidden accounts
+  hiddenAccountIds: Set<string>;
+  toggleAccountHidden: (accountId: string) => Promise<void>;
+
+  // Phase 1: Category overrides
+  getDisplayCategory: (rawCategory: string) => string;
+  renameCategory: (rawCategory: string, newName: string) => Promise<void>;
+
+  // Phase 1: Rules
+  rules: CategorizationRule[];
+  addRule: (rule: Omit<CategorizationRule, "id" | "createdAt">) => Promise<void>;
+  deleteRule: (id: string) => Promise<void>;
+
+  // Phase 1: Splits
+  splits: Record<string, TransactionSplit>;
+  updateSplit: (txId: string, splits: TransactionSplit["splits"]) => Promise<void>;
+  deleteSplit: (txId: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -231,9 +257,10 @@ function plaidTransactionsToGroups(
 
 function buildBudgetSections(
   transactions: PlaidTransaction[],
-  budgetTargets: Record<string, number>
+  budgetTargets: Record<string, number>,
+  transferIds?: Set<string>
 ): BudgetSection[] {
-  const actualSpending = computeActualSpending(transactions);
+  const actualSpending = computeActualSpending(transactions, undefined, transferIds);
 
   // Build category list from actual spending + saved targets
   const allCategories = Array.from(new Set([
@@ -331,62 +358,112 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [userSettings, setUserSettings] = useState<UserSettings>({});
   const [transactionEdits, setTransactionEdits] = useState<Record<string, TransactionEdit>>({});
   const [netWorthSnapshots, setNetWorthSnapshots] = useState<{ date: string; value: number }[]>([]);
+  const [rules, setRules] = useState<CategorizationRule[]>([]);
+  const [splits, setSplits] = useState<Record<string, TransactionSplit>>({});
 
   // Use mock data if not logged in OR if logged in but no real data was fetched
   const hasRealData = accounts.length > 0 || rawTransactions.length > 0;
   const isUsingMockData = !user || (!hasRealData && !isLoading);
 
-  // -- Account groups
-  const accountGroups = isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
+  // Phase 1: Compute transfer IDs once, then apply user overrides
+  const transferIds = useMemo(() => {
+    if (isUsingMockData) return new Set<string>();
+    const auto = detectTransfers(rawTransactions);
+    // Apply user overrides
+    for (const txId of userSettings.manualTransferIds || []) auto.add(txId);
+    for (const txId of userSettings.nonTransferIds || []) auto.delete(txId);
+    return auto;
+  }, [isUsingMockData, rawTransactions, userSettings.manualTransferIds, userSettings.nonTransferIds]);
+
+  // Phase 1: Hidden accounts
+  const hiddenAccountIds = useMemo(
+    () => new Set(userSettings.hiddenAccounts || []),
+    [userSettings.hiddenAccounts]
+  );
+
+  // Phase 1: Category display helper
+  const getDisplayCategory = useCallback((rawCategory: string): string => {
+    return userSettings.categoryOverrides?.[rawCategory] || rawCategory;
+  }, [userSettings.categoryOverrides]);
+
+  // -- Account groups: full list (shown on Accounts page with hide toggles)
+  const accountGroups = useMemo(() => {
+    return isUsingMockData ? mockAccountGroups : plaidAccountsToGroups(accounts);
+  }, [isUsingMockData, accounts]);
+
+  // -- Visible account groups: filtered for totals, charts, dashboard KPIs
+  const visibleAccountGroups = useMemo(() => {
+    if (hiddenAccountIds.size === 0) return accountGroups;
+    return accountGroups
+      .map((g) => ({ ...g, accounts: g.accounts.filter((a) => !hiddenAccountIds.has(a.id)) }))
+      .filter((g) => g.accounts.length > 0);
+  }, [accountGroups, hiddenAccountIds]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.account_id, a])), [accounts]);
 
-  // Apply transaction edits to groups
+  // Apply rules engine — find any matching rule for a transaction
+  const applyRules = useCallback((merchantName: string): CategorizationRule | null => {
+    if (rules.length === 0) return null;
+    const nameLower = merchantName.toLowerCase();
+    for (const rule of rules) {
+      if (!rule.merchantPattern) continue;
+      if (nameLower.includes(rule.merchantPattern.toLowerCase())) return rule;
+    }
+    return null;
+  }, [rules]);
+
+  // Apply transaction edits + rules + category overrides + hidden accounts
   const transactionGroups = useMemo(() => {
     const base = isUsingMockData
       ? mockTransactionGroups
       : plaidTransactionsToGroups(rawTransactions, accountMap);
 
-    if (Object.keys(transactionEdits).length === 0) return base;
+    return base
+      .map((group) => ({
+        ...group,
+        transactions: group.transactions
+          .filter((tx) => !hiddenAccountIds.has(tx.accountId))
+          .map((tx) => {
+            const edit = transactionEdits[tx.id];
+            const rule = applyRules(edit?.merchantName || tx.merchantName);
+            const isTransfer = transferIds.has(tx.id);
 
-    return base.map((group) => ({
-      ...group,
-      transactions: group.transactions.map((tx) => {
-        const edit = transactionEdits[tx.id];
-        if (!edit) return tx;
-        return {
-          ...tx,
-          merchantName: edit.merchantName ?? tx.merchantName,
-          notes: edit.notes ?? tx.notes,
-          isFlagged: edit.isFlagged ?? tx.isFlagged,
-          isRecurring: edit.isRecurring ?? tx.isRecurring,
-          category: edit.category
-            ? { ...tx.category, name: edit.category }
-            : tx.category,
-        };
-      }),
-    }));
-  }, [isUsingMockData, rawTransactions, accountMap, transactionEdits]);
+            const categoryName = edit?.category ?? rule?.setCategory ?? tx.category.name;
+            const displayCategory = getDisplayCategory(categoryName);
+
+            return {
+              ...tx,
+              merchantName: edit?.merchantName ?? tx.merchantName,
+              notes: edit?.notes ?? tx.notes,
+              isFlagged: edit?.isFlagged ?? rule?.setFlag ?? tx.isFlagged,
+              isRecurring: edit?.isRecurring ?? rule?.setRecurring ?? tx.isRecurring,
+              isTransfer,
+              category: { ...tx.category, name: displayCategory },
+            } as any;
+          }),
+      }))
+      .filter((g) => g.transactions.length > 0);
+  }, [isUsingMockData, rawTransactions, accountMap, transactionEdits, hiddenAccountIds, applyRules, transferIds, getDisplayCategory]);
 
   // -- Cash flow (computed from transactions)
   const cashFlowMonths = useMemo(
-    () => (isUsingMockData ? mockCashFlowMonths : computeCashFlowMonths(rawTransactions, 6)),
-    [isUsingMockData, rawTransactions]
+    () => (isUsingMockData ? mockCashFlowMonths : computeCashFlowMonths(rawTransactions, 6, transferIds)),
+    [isUsingMockData, rawTransactions, transferIds]
   );
 
   const expensesByCategory = useMemo(
-    () => (isUsingMockData ? mockExpenseBreakdown : computeExpenseBreakdown(rawTransactions)),
-    [isUsingMockData, rawTransactions]
+    () => (isUsingMockData ? mockExpenseBreakdown : computeExpenseBreakdown(rawTransactions, undefined, transferIds)),
+    [isUsingMockData, rawTransactions, transferIds]
   );
 
   const incomeBySource = useMemo(
-    () => (isUsingMockData ? mockIncomeBreakdown : computeIncomeBreakdown(rawTransactions)),
-    [isUsingMockData, rawTransactions]
+    () => (isUsingMockData ? mockIncomeBreakdown : computeIncomeBreakdown(rawTransactions, undefined, transferIds)),
+    [isUsingMockData, rawTransactions, transferIds]
   );
 
   // -- Reports data
   const monthlyData = useMemo(
-    () => (isUsingMockData ? mockMonthlyData : computeMonthlyTotals(rawTransactions, 6)),
-    [isUsingMockData, rawTransactions]
+    () => (isUsingMockData ? mockMonthlyData : computeMonthlyTotals(rawTransactions, 6, transferIds)),
+    [isUsingMockData, rawTransactions, transferIds]
   );
 
   const flatTransactions = useMemo(
@@ -415,8 +492,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // -- Budget
   const budgetSections = useMemo(
-    () => (isUsingMockData ? mockBudgetSections : buildBudgetSections(rawTransactions, budgetTargets)),
-    [isUsingMockData, rawTransactions, budgetTargets]
+    () => (isUsingMockData ? mockBudgetSections : buildBudgetSections(rawTransactions, budgetTargets, transferIds)),
+    [isUsingMockData, rawTransactions, budgetTargets, transferIds]
   );
 
   // -- Advice / Insights
@@ -587,6 +664,68 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (user) await firestore.setDoc(user.uid, ["transaction_edits", txId], merged as any);
   }, [transactionEdits, user]);
 
+  // Phase 1: Mark/unmark as transfer
+  const markAsTransfer = useCallback(async (transactionId: string, isTransfer: boolean) => {
+    const manual = userSettings.manualTransferIds || [];
+    const nonTransfer = userSettings.nonTransferIds || [];
+    const newManual = isTransfer ? Array.from(new Set([...manual, transactionId])) : manual.filter((id) => id !== transactionId);
+    const newNon = !isTransfer ? Array.from(new Set([...nonTransfer, transactionId])) : nonTransfer.filter((id) => id !== transactionId);
+    const newSettings = { ...userSettings, manualTransferIds: newManual, nonTransferIds: newNon };
+    setUserSettings(newSettings);
+    if (user) await firestore.setDoc(user.uid, ["settings", "user"], newSettings as any);
+  }, [userSettings, user]);
+
+  // Phase 1: Toggle account hidden
+  const toggleAccountHidden = useCallback(async (accountId: string) => {
+    const current = userSettings.hiddenAccounts || [];
+    const next = current.includes(accountId) ? current.filter((id) => id !== accountId) : [...current, accountId];
+    const newSettings = { ...userSettings, hiddenAccounts: next };
+    setUserSettings(newSettings);
+    if (user) await firestore.setDoc(user.uid, ["settings", "user"], newSettings as any);
+  }, [userSettings, user]);
+
+  // Phase 1: Rename a category
+  const renameCategory = useCallback(async (rawCategory: string, newName: string) => {
+    const overrides = { ...(userSettings.categoryOverrides || {}) };
+    if (!newName.trim() || newName === rawCategory) {
+      delete overrides[rawCategory];
+    } else {
+      overrides[rawCategory] = newName.trim();
+    }
+    const newSettings = { ...userSettings, categoryOverrides: overrides };
+    setUserSettings(newSettings);
+    if (user) await firestore.setDoc(user.uid, ["settings", "user"], newSettings as any);
+  }, [userSettings, user]);
+
+  // Phase 1: Rules
+  const addRule = useCallback(async (rule: Omit<CategorizationRule, "id" | "createdAt">) => {
+    const id = `rule_${Date.now()}`;
+    const newRule: CategorizationRule = { ...rule, id, createdAt: Date.now() };
+    setRules((prev) => [...prev, newRule]);
+    if (user) await firestore.setDoc(user.uid, ["rules", id], newRule as any);
+  }, [user]);
+
+  const deleteRule = useCallback(async (id: string) => {
+    setRules((prev) => prev.filter((r) => r.id !== id));
+    if (user) await firestore.deleteDoc(user.uid, ["rules", id]);
+  }, [user]);
+
+  // Phase 1: Splits
+  const updateSplit = useCallback(async (txId: string, splitList: TransactionSplit["splits"]) => {
+    const split: TransactionSplit = { id: txId, splits: splitList };
+    setSplits((prev) => ({ ...prev, [txId]: split }));
+    if (user) await firestore.setDoc(user.uid, ["transaction_splits", txId], split as any);
+  }, [user]);
+
+  const deleteSplit = useCallback(async (txId: string) => {
+    setSplits((prev) => {
+      const next = { ...prev };
+      delete next[txId];
+      return next;
+    });
+    if (user) await firestore.deleteDoc(user.uid, ["transaction_splits", txId]);
+  }, [user]);
+
   const sendChatMessage = useCallback(async (
     message: string,
     history: { role: string; content: string }[] = []
@@ -639,10 +778,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 - Total Liabilities: $${totalLiabilities.toFixed(2)}
 - Savings Rate (${monthName}): ${monthIncome > 0 ? (((monthIncome - monthSpending) / monthIncome) * 100).toFixed(1) : "0"}%
 
-**Accounts by Type**
+**Accounts by Type** (account_id shown in brackets — use for hide_account tool)
 ${Object.entries(accountsByType).map(([type, accts]) => {
   const total = accts.reduce((s, a) => s + (a.current_balance || 0), 0);
-  return `${type} ($${total.toFixed(2)} total):\n${accts.map((a) => `  - ${a.name}${(a as any).mask ? ` ...${(a as any).mask}` : ""}: $${(a.current_balance || 0).toFixed(2)}${(a as any).limit ? ` (limit: $${(a as any).limit})` : ""}`).join("\n")}`;
+  return `${type} ($${total.toFixed(2)} total):\n${accts.map((a) => `  - [${a.account_id}] ${a.name}${(a as any).mask ? ` ...${(a as any).mask}` : ""}: $${(a.current_balance || 0).toFixed(2)}${(a as any).limit ? ` (limit: $${(a as any).limit})` : ""}`).join("\n")}`;
 }).join("\n\n")}
 
 **${monthName} Activity**
@@ -701,12 +840,14 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
 
     // Load all user data from Firestore in parallel
     (async () => {
-      const [budgets, settings, userGoals, edits, snapshots] = await Promise.all([
+      const [budgets, settings, userGoals, edits, snapshots, userRules, userSplits] = await Promise.all([
         firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
         firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
         firestore.listCollection<Goal>(user.uid, "goals"),
         firestore.listCollection<TransactionEdit & { id: string }>(user.uid, "transaction_edits"),
         firestore.listCollection<{ value: number }>(user.uid, "snapshots"),
+        firestore.listCollection<CategorizationRule>(user.uid, "rules"),
+        firestore.listCollection<TransactionSplit>(user.uid, "transaction_splits"),
       ]);
 
       if (budgets) setBudgetTargets(budgets);
@@ -716,6 +857,8 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
         Object.fromEntries(edits.map((e) => [e.id, e as TransactionEdit]))
       );
       setNetWorthSnapshots(snapshots.map((s) => ({ date: s.id, value: s.value })));
+      setRules(userRules);
+      setSplits(Object.fromEntries(userSplits.map((s) => [s.id, s])));
     })();
 
     Promise.all([refreshAccounts(), refreshTransactions(90), refreshInvestments()])
@@ -752,7 +895,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
   return (
     <DataContext.Provider
       value={{
-        accounts, accountGroups, transactionGroups, rawTransactions, linkedItems, brokenItems,
+        accounts, accountGroups, visibleAccountGroups, transactionGroups, rawTransactions, linkedItems, brokenItems,
         isLoading, isUsingMockData, error,
         refreshAccounts, refreshTransactions, connectBank, disconnectBank,
         sendChatMessage,
@@ -772,6 +915,12 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
         transactionEdits, updateTransaction,
         // Net worth timeline
         netWorthTimeline,
+        // Phase 1
+        transferIds, markAsTransfer,
+        hiddenAccountIds, toggleAccountHidden,
+        getDisplayCategory, renameCategory,
+        rules, addRule, deleteRule,
+        splits, updateSplit, deleteSplit,
       }}
     >
       {children}

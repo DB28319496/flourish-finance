@@ -109,6 +109,43 @@ const tools = [
     },
   },
   {
+    name: "rename_category",
+    description: "Rename a Plaid category globally (e.g., rename 'Food and Drink' to 'Groceries'). The rename applies everywhere in the app.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        original_category: { type: "string", description: "The current Plaid category name" },
+        new_name: { type: "string", description: "The renamed category name" },
+      },
+      required: ["original_category", "new_name"],
+    },
+  },
+  {
+    name: "create_rule",
+    description: "Create an auto-categorization rule. When any transaction's merchant contains the pattern, the rule's actions are applied.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        merchant_pattern: { type: "string", description: "Substring to match in merchant name (case-insensitive)" },
+        set_category: { type: "string", description: "Category to auto-assign (optional)" },
+        set_recurring: { type: "boolean", description: "Whether to mark matches as recurring (optional)" },
+        set_flag: { type: "boolean", description: "Whether to flag matches (optional)" },
+      },
+      required: ["merchant_pattern"],
+    },
+  },
+  {
+    name: "hide_account",
+    description: "Hide an account from net worth totals and charts (user still sees it on Accounts page).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        account_id: { type: "string" },
+      },
+      required: ["account_id"],
+    },
+  },
+  {
     name: "add_manual_recurring",
     description: "Add a manual recurring income or expense (for things Plaid didn't auto-detect, like cash income or a new subscription).",
     input_schema: {
@@ -204,6 +241,36 @@ async function executeTool(name: string, input: any, uid: string): Promise<{ suc
         return { success: true, result: { key: input.key, value: input.value } };
       }
 
+      case "rename_category": {
+        const settingsDoc = await userRef.collection("settings").doc("user").get();
+        const overrides = (settingsDoc.data()?.categoryOverrides as Record<string, string>) || {};
+        overrides[input.original_category] = input.new_name;
+        await userRef.collection("settings").doc("user").set({ categoryOverrides: overrides }, { merge: true });
+        return { success: true, result: { renamed: input.original_category, to: input.new_name } };
+      }
+
+      case "create_rule": {
+        const id = `rule_${Date.now()}`;
+        const rule = {
+          id,
+          merchantPattern: input.merchant_pattern,
+          setCategory: input.set_category,
+          setRecurring: input.set_recurring,
+          setFlag: input.set_flag,
+          createdAt: Date.now(),
+        };
+        await userRef.collection("rules").doc(id).set(rule);
+        return { success: true, result: { rule_id: id, rule } };
+      }
+
+      case "hide_account": {
+        const settingsDoc = await userRef.collection("settings").doc("user").get();
+        const hidden = (settingsDoc.data()?.hiddenAccounts as string[]) || [];
+        if (!hidden.includes(input.account_id)) hidden.push(input.account_id);
+        await userRef.collection("settings").doc("user").set({ hiddenAccounts: hidden }, { merge: true });
+        return { success: true, result: { hidden: input.account_id } };
+      }
+
       case "add_manual_recurring": {
         const id = `manual_${Date.now()}`;
         const item = {
@@ -263,6 +330,9 @@ You have direct access to the user's real-time financial data AND you can take a
 - "Turn off email notifications" → call update_setting
 - "I got paid $500 cash from freelance work" → call add_manual_recurring or update_transaction as appropriate
 - "Update my goal — I already saved $5k" → call list_goals first to get ID, then update_goal
+- "Rename 'Food and Drink' to 'Groceries'" → call rename_category
+- "Anytime I see Starbucks, tag it as Coffee" → call create_rule with merchant_pattern="Starbucks", set_category="Coffee"
+- "Hide my Employer Plan 401k from totals" → call hide_account (use account list to find ID)
 
 Use sensible defaults when the user doesn't specify everything. For example, if they say "create a goal for a new car for $20k", pick a reasonable deadline (6-12 months), monthly contribution (target/months), icon (🚗), and color.
 

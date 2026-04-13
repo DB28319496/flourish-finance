@@ -29,6 +29,9 @@ const TOOL_LABELS: Record<string, (input: any, result: any) => string> = {
   update_transaction: (input) => `Updated transaction`,
   update_setting: (input) => `Updated setting: ${input.key}`,
   add_manual_recurring: (input) => `Added ${input.type}: ${input.name} ($${input.amount} ${input.frequency})`,
+  rename_category: (input) => `Renamed "${input.original_category}" → "${input.new_name}"`,
+  create_rule: (input) => `Created rule: when merchant contains "${input.merchant_pattern}"`,
+  hide_account: () => `Hid account from totals`,
 };
 
 export function AIChatPanel({

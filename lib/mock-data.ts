@@ -138,6 +138,25 @@ export interface UserSettings {
   displayName?: string;
   currency?: string;
   excludedRecurring?: string[]; // merchant names the user has marked as not recurring
+  hiddenAccounts?: string[]; // account_ids to exclude from totals/charts
+  categoryOverrides?: Record<string, string>; // plaidCategoryName -> renamedCategory
+  manualTransferIds?: string[]; // transaction_ids user manually marked as transfers
+  nonTransferIds?: string[]; // transaction_ids user manually un-marked as transfers
+}
+
+export interface CategorizationRule {
+  id: string;
+  merchantPattern: string; // substring or regex-like pattern
+  setCategory?: string;
+  setFlag?: boolean;
+  setRecurring?: boolean;
+  setNotes?: string;
+  createdAt?: number;
+}
+
+export interface TransactionSplit {
+  id: string; // = transaction_id
+  splits: { category: string; amount: number; notes?: string }[];
 }
 
 export interface TransactionEdit {

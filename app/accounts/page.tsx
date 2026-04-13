@@ -15,6 +15,8 @@ import {
   Banknote,
   TrendingUp,
   CreditCard,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   Card,
@@ -62,19 +64,22 @@ function formatLastSynced(timeStr: string): string {
 }
 
 export default function AccountsPage() {
-  const { accountGroups, netWorthTimeline, isLoading, isUsingMockData } = useData();
+  const { accountGroups, netWorthTimeline, hiddenAccountIds, toggleAccountHidden, isLoading, isUsingMockData } = useData();
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
   );
 
+  // Totals exclude hidden accounts
+  const visibleAccounts = (g: typeof accountGroups[0]) =>
+    g.accounts.filter((a) => !hiddenAccountIds.has(a.id));
   const assets = accountGroups
     .filter((g) => g.type !== "creditCards" && g.type !== "loans")
-    .reduce((sum, g) => sum + g.accounts.reduce((s, a) => s + a.balance, 0), 0);
+    .reduce((sum, g) => sum + visibleAccounts(g).reduce((s, a) => s + a.balance, 0), 0);
   const liabilities = accountGroups
     .filter((g) => g.type === "creditCards" || g.type === "loans")
-    .reduce((sum, g) => sum + g.accounts.reduce((s, a) => s + a.balance, 0), 0);
+    .reduce((sum, g) => sum + visibleAccounts(g).reduce((s, a) => s + a.balance, 0), 0);
   const netWorth = assets - liabilities;
 
   const toggleGroup = (groupId: string) => {
@@ -234,11 +239,12 @@ export default function AccountsPage() {
                         ? account.balance / account.creditLimit
                         : 0;
 
+                    const isHidden = hiddenAccountIds.has(account.id);
                     return (
                       <Card
                         key={account.id}
                         hover
-                        className="p-4 cursor-pointer"
+                        className={cn("p-4 cursor-pointer", isHidden && "opacity-60")}
                         onClick={() => setSelectedAccountId(account.id)}
                       >
                         <div className="flex items-center gap-3">
@@ -281,6 +287,22 @@ export default function AccountsPage() {
                               {formatLastSynced(account.lastSyncedAt)}
                             </p>
                           </div>
+
+                          {/* Visibility toggle */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAccountHidden(account.id);
+                            }}
+                            title={isHidden ? 'Show in totals' : 'Hide from totals'}
+                            className="flex-shrink-0 p-2 rounded-lg hover:bg-flourish-hover transition-colors"
+                          >
+                            {isHidden ? (
+                              <EyeOff size={16} className="text-flourish-secondary" />
+                            ) : (
+                              <Eye size={16} className="text-flourish-secondary" />
+                            )}
+                          </button>
                         </div>
 
                         {/* Credit Card Usage Bar */}
