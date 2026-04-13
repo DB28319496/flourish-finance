@@ -16,31 +16,25 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   CreditCard, TrendingUp, Shield, PiggyBank, AlertTriangle, Sparkles,
 };
 
-// Fallback insights when no real data is available (unauthenticated)
+// Demo insights for unauthenticated users — signed-in users get AI-generated advice
 const fallbackInsights: ComputedInsight[] = [
   {
-    id: 1, category: 'Spending', iconName: 'CreditCard', color: '#ef4444', bgColor: 'bg-red-50',
-    title: 'Dining out spending is up 23% this month',
-    description: 'You\'ve spent $482 on dining out so far in April, compared to $392 last month. Consider cooking at home a few more nights to stay within your budget.',
-    impact: 'Save ~$90/month', priority: 'high',
+    id: 1, category: 'Welcome', iconName: 'Sparkles', color: '#E5633A', bgColor: 'bg-orange-50',
+    title: 'Sign in to see personalized insights',
+    description: 'Once you connect your accounts, your AI advisor will surface real spending trends, budget warnings, tax opportunities, and savings recommendations tailored to your actual data.',
+    impact: 'Unlock full insights', priority: 'positive',
   },
   {
-    id: 2, category: 'Savings', iconName: 'PiggyBank', color: '#10b981', bgColor: 'bg-emerald-50',
-    title: 'You\'re on track to hit your emergency fund goal',
-    description: 'At your current savings rate of $500/month, you\'ll reach your $15,000 emergency fund target by December 2026. Keep it up!',
-    impact: 'On track', priority: 'positive',
+    id: 2, category: 'Example', iconName: 'CreditCard', color: '#6b7280', bgColor: 'bg-gray-50',
+    title: 'Example: Dining spending up X%',
+    description: 'When your spending patterns shift, Flourish AI will flag them here with specific dollar amounts and suggestions for cutting back.',
+    impact: 'Demo', priority: 'medium',
   },
   {
-    id: 3, category: 'Investments', iconName: 'TrendingUp', color: '#3b82f6', bgColor: 'bg-blue-50',
-    title: 'Consider rebalancing your portfolio',
-    description: 'Your tech allocation is at 58%, which is above your 45% target. Consider moving some funds into bonds or international equities for better diversification.',
-    impact: 'Reduce risk', priority: 'medium',
-  },
-  {
-    id: 4, category: 'Protection', iconName: 'Shield', color: '#8b5cf6', bgColor: 'bg-purple-50',
-    title: 'Set up automatic bill pay for your student loan',
-    description: 'You\'ve been paying your student loan manually each month. Setting up autopay can save you 0.25% on your interest rate and prevent late payments.',
-    impact: 'Save $87/year', priority: 'medium',
+    id: 3, category: 'Example', iconName: 'PiggyBank', color: '#6b7280', bgColor: 'bg-gray-50',
+    title: 'Example: Goal milestone progress',
+    description: 'When you\'re ahead of or behind your savings pace, you\'ll see specific projections here.',
+    impact: 'Demo', priority: 'positive',
   },
 ];
 

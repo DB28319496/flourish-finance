@@ -1,8 +1,11 @@
 /**
  * Household helpers for server-side routes.
- * The iOS app uses a household-based data model where Plaid tokens are
- * shared across household members. This module resolves a user's household
- * and returns their access tokens.
+ *
+ * Plaid tokens are scoped to either:
+ *  (a) household_id — shared across all members of that household (iOS app + new web connections)
+ *  (b) user_id — owned by a single user
+ *
+ * We NEVER return tokens that lack both scopes to prevent cross-tenant leakage.
  */
 
 import { adminDb } from "./firebase-admin";
@@ -21,77 +24,53 @@ export async function getUserHouseholdId(uid: string): Promise<string | null> {
 }
 
 /**
- * Get all active Plaid access tokens for a user's household.
- * Falls back to tokens owned directly by the user if no household exists.
+ * Get all active Plaid access tokens accessible to this user.
+ * Tokens must be explicitly tied to the user or their household.
  */
 export async function getPlaidTokensForUser(
   uid: string
 ): Promise<Array<{ id: string; access_token: string; item_id: string }>> {
-  // Try household-based tokens first
   const householdId = await getUserHouseholdId(uid);
+  const results: Array<{ id: string; access_token: string; item_id: string }> = [];
+  const seen = new Set<string>();
 
+  // 1. Tokens scoped to the user's household
   if (householdId) {
-    // Tokens may be stored with household_id field
     const byHousehold = await adminDb
       .collection("plaid_access_tokens")
       .where("household_id", "==", householdId)
       .where("is_active", "==", true)
       .get();
 
-    if (!byHousehold.empty) {
-      return byHousehold.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          access_token: data.access_token,
-          item_id: data.item_id || d.id,
-        };
+    for (const d of byHousehold.docs) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      const data = d.data();
+      results.push({
+        id: d.id,
+        access_token: data.access_token,
+        item_id: data.item_id || d.id,
       });
-    }
-
-    // Some tokens have user_id = "unknown" but are shared in the household
-    // In that case fall through to return all tokens with access_token present
-    // (this is the iOS app's actual schema)
-    const allActive = await adminDb
-      .collection("plaid_access_tokens")
-      .where("is_active", "==", true)
-      .get();
-
-    if (!allActive.empty) {
-      // Get household members
-      const householdDoc = await adminDb.collection("households").doc(householdId).get();
-      const memberIds = (householdDoc.data()?.memberUserIDs as string[]) || [uid];
-
-      // Return tokens that belong to a member OR have user_id=unknown (household-owned)
-      return allActive.docs
-        .filter((d) => {
-          const uId = d.data().user_id;
-          return memberIds.includes(uId) || uId === "unknown";
-        })
-        .map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            access_token: data.access_token,
-            item_id: data.item_id || d.id,
-          };
-        });
     }
   }
 
-  // Fallback: tokens directly owned by this user
+  // 2. Tokens directly owned by this user
   const byUser = await adminDb
     .collection("plaid_access_tokens")
     .where("user_id", "==", uid)
     .where("is_active", "==", true)
     .get();
 
-  return byUser.docs.map((d) => {
+  for (const d of byUser.docs) {
+    if (seen.has(d.id)) continue;
+    seen.add(d.id);
     const data = d.data();
-    return {
+    results.push({
       id: d.id,
       access_token: data.access_token,
       item_id: data.item_id || d.id,
-    };
-  });
+    });
+  }
+
+  return results;
 }

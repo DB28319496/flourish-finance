@@ -190,132 +190,133 @@ export interface BudgetTargetConfig {
 // DATA
 // ---------------------------------------------------------------------------
 
+// All mock data below is fictional — used only for unauthenticated visitors
+// browsing the app in demo mode. Real user data is isolated per-household.
+
 export const accountGroups: AccountGroup[] = [
   {
     id: "cash", type: "cash", label: "Cash", icon: "Banknote",
     accounts: [
-      { id: "1", name: "360 Checking", institution: "Capital One", type: "cash", subtype: "Checking", balance: 7763.46, lastSyncedAt: "9 hours ago", logoColor: "#E03131", monthChange: 0, sparklineData: [7700,7720,7750,7760,7763] },
-      { id: "2", name: "360 Performance Savings", institution: "Capital One", type: "cash", subtype: "Savings", balance: 7111.65, lastSyncedAt: "9 hours ago", logoColor: "#E03131", monthChange: 0, sparklineData: [7100,7105,7108,7110,7111] },
+      { id: "demo-1", name: "Everyday Checking", institution: "Demo Bank", type: "cash", subtype: "Checking", balance: 4820.15, lastSyncedAt: "Demo", logoColor: "#4D8FDB", monthChange: 0, sparklineData: [4750,4780,4800,4810,4820] },
+      { id: "demo-2", name: "High-Yield Savings", institution: "Demo Bank", type: "cash", subtype: "Savings", balance: 12500.00, lastSyncedAt: "Demo", logoColor: "#4D8FDB", monthChange: 0, sparklineData: [11800,12000,12200,12400,12500] },
     ],
   },
   {
     id: "invest", type: "investments", label: "Investments", icon: "TrendingUp",
     accounts: [
-      { id: "3", name: "Individual Brokerage", institution: "Charles Schwab", type: "investments", subtype: "Brokerage (Taxable)", balance: 7956.18, lastSyncedAt: "9 hours ago", logoColor: "#4D8FDB", monthChange: 0, sparklineData: [8000,7980,7950,7960,7956] },
-      { id: "4", name: "Roth IRA", institution: "Charles Schwab", type: "investments", subtype: "Individual Retirement Account", balance: 15638.73, lastSyncedAt: "9 hours ago", logoColor: "#4D8FDB", monthChange: 0, sparklineData: [15700,15680,15650,15640,15638] },
-      { id: "5", name: "401(k) Plan", institution: "Employer Plan", type: "investments", subtype: "401k", balance: 31524.37, lastSyncedAt: "2 hours ago", logoColor: "#2B8A3E", monthChange: 0, sparklineData: [31600,31580,31550,31530,31524] },
+      { id: "demo-3", name: "Sample Brokerage", institution: "Sample Broker", type: "investments", subtype: "Brokerage", balance: 18250.42, lastSyncedAt: "Demo", logoColor: "#2B8A3E", monthChange: 0, sparklineData: [17800,17900,18000,18100,18250] },
+      { id: "demo-4", name: "Roth IRA", institution: "Sample Broker", type: "investments", subtype: "Retirement", balance: 22100.80, lastSyncedAt: "Demo", logoColor: "#2B8A3E", monthChange: 0, sparklineData: [21500,21700,21900,22000,22100] },
     ],
   },
   {
     id: "credit", type: "creditCards", label: "Credit Cards", icon: "CreditCard",
     accounts: [
-      { id: "6", name: "Credit Card ...3856", institution: "Capital One", type: "creditCards", subtype: "Credit Card", balance: 5639.88, lastSyncedAt: "9 hours ago", logoColor: "#E5633A", monthChange: 0, sparklineData: [5200,5400,5500,5600,5639], creditLimit: 10000 },
-      { id: "7", name: "Credit Card ...7540", institution: "Capital One", type: "creditCards", subtype: "Credit Card", balance: 8294.73, lastSyncedAt: "9 hours ago", logoColor: "#7C3AED", monthChange: 0, sparklineData: [7800,8000,8100,8200,8294], creditLimit: 15000 },
+      { id: "demo-5", name: "Rewards Card", institution: "Demo Bank", type: "creditCards", subtype: "Credit Card", balance: 1425.30, lastSyncedAt: "Demo", logoColor: "#E5633A", monthChange: 0, sparklineData: [1200,1300,1350,1400,1425], creditLimit: 10000 },
     ],
   },
 ];
 
 export const transactionGroups: TransactionDateGroup[] = [
   {
-    id: "apr11", date: "2026-04-11",
+    id: "demo-d1", date: "2026-04-12",
     transactions: [
-      { id: "t1", merchantName: "Flo Health", originalStatement: "FLOHEALTH.COM", amount: 84.99, date: "2026-04-11", category: { name: "Medical", emoji: "💊", group: "Health" }, accountName: "Credit Card ...7540", accountId: "7", isPending: true, isRecurring: false, isFlagged: false, notes: "" },
+      { id: "demo-t1", merchantName: "Grocery Store", originalStatement: "GROCERY STORE #123", amount: 87.40, date: "2026-04-12", category: { name: "Groceries", emoji: "🛒", group: "Food & Dining" }, accountName: "Rewards Card", accountId: "demo-5", isPending: true, isRecurring: false, isFlagged: false, notes: "" },
+      { id: "demo-t2", merchantName: "Coffee Shop", originalStatement: "COFFEE SHOP", amount: 5.75, date: "2026-04-12", category: { name: "Coffee Shops", emoji: "☕️", group: "Food & Dining" }, accountName: "Rewards Card", accountId: "demo-5", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
     ],
   },
   {
-    id: "apr10", date: "2026-04-10",
+    id: "demo-d2", date: "2026-04-11",
     transactions: [
-      { id: "t2", merchantName: "DoorDash", originalStatement: "DOORDASH", amount: 29.94, date: "2026-04-10", category: { name: "Restaurants & Bars", emoji: "🍽", group: "Food & Dining" }, accountName: "Credit Card ...7540", accountId: "7", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
-      { id: "t3", merchantName: "Ally Bank", originalStatement: "ALLY BANK", amount: 351.34, date: "2026-04-10", category: { name: "Auto Payment", emoji: "🚗", group: "Auto & Transport" }, accountName: "360 Checking", accountId: "1", isPending: false, isRecurring: true, isFlagged: false, notes: "" },
-      { id: "t4", merchantName: "Tesla", originalStatement: "TESLA INC", amount: 99.00, date: "2026-04-10", category: { name: "Miscellaneous", emoji: "💲", group: "Other" }, accountName: "360 Checking", accountId: "1", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
+      { id: "demo-t3", merchantName: "Streaming Service", originalStatement: "STREAMING*SUB", amount: 15.99, date: "2026-04-11", category: { name: "Entertainment", emoji: "🎬", group: "Entertainment" }, accountName: "Rewards Card", accountId: "demo-5", isPending: false, isRecurring: true, isFlagged: false, notes: "" },
+      { id: "demo-t4", merchantName: "Gas Station", originalStatement: "GAS STATION", amount: 42.18, date: "2026-04-11", category: { name: "Gas", emoji: "⛽", group: "Auto & Transport" }, accountName: "Everyday Checking", accountId: "demo-1", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
+      { id: "demo-t5", merchantName: "Ride Share", originalStatement: "RIDESHARE TRIP", amount: 12.50, date: "2026-04-11", category: { name: "Taxi & Ride Shares", emoji: "🚕", group: "Auto & Transport" }, accountName: "Rewards Card", accountId: "demo-5", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
     ],
   },
   {
-    id: "apr09", date: "2026-04-09",
+    id: "demo-d3", date: "2026-04-10",
     transactions: [
-      { id: "t5", merchantName: "Ulta Beauty", originalStatement: "ULTA BEAUTY", amount: 50.00, date: "2026-04-09", category: { name: "Shopping", emoji: "🛍", group: "Shopping" }, accountName: "Credit Card ...7540", accountId: "7", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
-      { id: "t6", merchantName: "Uber", originalStatement: "UBER TRIP", amount: 9.99, date: "2026-04-09", category: { name: "Taxi & Ride Shares", emoji: "🚕", group: "Auto & Transport" }, accountName: "360 Checking", accountId: "1", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
-      { id: "t7", merchantName: "Starbucks", originalStatement: "STARBUCKS", amount: 10.00, date: "2026-04-09", category: { name: "Coffee Shops", emoji: "☕️", group: "Food & Dining" }, accountName: "Credit Card ...7540", accountId: "7", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
+      { id: "demo-t6", merchantName: "Employer Payroll", originalStatement: "PAYROLL DEPOSIT", amount: -3200.00, date: "2026-04-10", category: { name: "Paychecks", emoji: "💵", group: "Income" }, accountName: "Everyday Checking", accountId: "demo-1", isPending: false, isRecurring: true, isFlagged: false, notes: "" },
+      { id: "demo-t7", merchantName: "Online Retailer", originalStatement: "ONLINE RETAILER", amount: 48.20, date: "2026-04-10", category: { name: "Shopping", emoji: "🛍", group: "Shopping" }, accountName: "Rewards Card", accountId: "demo-5", isPending: false, isRecurring: false, isFlagged: false, notes: "" },
+    ],
+  },
+  {
+    id: "demo-d4", date: "2026-04-08",
+    transactions: [
+      { id: "demo-t8", merchantName: "Rent Payment", originalStatement: "RENT PAYMENT", amount: 1850.00, date: "2026-04-08", category: { name: "Rent", emoji: "🏠", group: "Housing" }, accountName: "Everyday Checking", accountId: "demo-1", isPending: false, isRecurring: true, isFlagged: false, notes: "" },
+      { id: "demo-t9", merchantName: "Gym Membership", originalStatement: "FITNESS CLUB", amount: 39.99, date: "2026-04-08", category: { name: "Fitness", emoji: "💪", group: "Health" }, accountName: "Rewards Card", accountId: "demo-5", isPending: false, isRecurring: true, isFlagged: false, notes: "" },
     ],
   },
 ];
 
 export const cashFlowMonths: CashFlowMonth[] = [
-  { id: "dec", month: "Dec", income: 2100, expenses: 5800 },
-  { id: "jan", month: "Jan", income: 14500, expenses: 7200 },
-  { id: "feb", month: "Feb", income: 7800, expenses: 6500 },
-  { id: "mar", month: "Mar", income: 8200, expenses: 7600 },
-  { id: "apr", month: "Apr", income: 2182, expenses: 5580 },
+  { id: "nov", month: "Nov", income: 6400, expenses: 4500 },
+  { id: "dec", month: "Dec", income: 6400, expenses: 5200 },
+  { id: "jan", month: "Jan", income: 6800, expenses: 4100 },
+  { id: "feb", month: "Feb", income: 6400, expenses: 3900 },
+  { id: "mar", month: "Mar", income: 6400, expenses: 4300 },
+  { id: "apr", month: "Apr", income: 6800, expenses: 3810 },
 ];
 
 export const expenseBreakdown: CashFlowBreakdown[] = [
-  { id: "mort", category: "Mortgage", emoji: "🏠", amount: 3566.16, percentage: 63.9, color: "#E03131" },
-  { id: "rest", category: "Restaurants & Bars", emoji: "🍽", amount: 695.48, percentage: 12.5, color: "#E5633A" },
-  { id: "shop", category: "Shopping", emoji: "🛍", amount: 352.07, percentage: 6.3, color: "#7C3AED" },
-  { id: "auto", category: "Auto Payment", emoji: "🚗", amount: 351.34, percentage: 6.3, color: "#4D8FDB" },
-  { id: "groc", category: "Groceries", emoji: "🍏", amount: 161.39, percentage: 2.9, color: "#2B8A3E" },
-  { id: "med",  category: "Medical", emoji: "💊", amount: 107.03, percentage: 1.9, color: "#0891B2" },
+  { id: "rent", category: "Rent", emoji: "🏠", amount: 1850.00, percentage: 48.5, color: "#E03131" },
+  { id: "groc", category: "Groceries", emoji: "🛒", amount: 520.40, percentage: 13.6, color: "#2B8A3E" },
+  { id: "dine", category: "Restaurants & Bars", emoji: "🍽", amount: 385.20, percentage: 10.1, color: "#E5633A" },
+  { id: "shop", category: "Shopping", emoji: "🛍", amount: 318.75, percentage: 8.4, color: "#7C3AED" },
+  { id: "auto", category: "Gas & Transport", emoji: "⛽", amount: 245.80, percentage: 6.4, color: "#4D8FDB" },
+  { id: "sub",  category: "Subscriptions", emoji: "🎬", amount: 89.97, percentage: 2.4, color: "#0891B2" },
 ];
 
 export const incomeBreakdown: CashFlowBreakdown[] = [
-  { id: "pay",   category: "Paychecks", emoji: "💵", amount: 1750.47, percentage: 80.2, color: "#2B8A3E" },
-  { id: "other", category: "Other Income", emoji: "💰", amount: 431.77, percentage: 19.8, color: "#5C9E6B" },
+  { id: "pay",   category: "Paychecks", emoji: "💵", amount: 6400.00, percentage: 94.1, color: "#2B8A3E" },
+  { id: "other", category: "Other Income", emoji: "💰", amount: 400.00, percentage: 5.9, color: "#5C9E6B" },
 ];
 
 export const budgetSections: BudgetSection[] = [
   { id: "income", name: "Income", type: "income", categories: [
-    { id: "b1", name: "Paychecks", emoji: "💵", group: "Income", budgetAmount: 9200, actualAmount: 1750 },
-    { id: "b2", name: "Other Income", emoji: "💰", group: "Income", budgetAmount: 9920, actualAmount: 432 },
+    { id: "b1", name: "Paychecks", emoji: "💵", group: "Income", budgetAmount: 6400, actualAmount: 6400 },
   ]},
   { id: "fixed", name: "Fixed", type: "fixed", categories: [
-    { id: "b3", name: "Auto Payment", emoji: "🚗", group: "Auto & Transport", budgetAmount: 350, actualAmount: 351 },
-    { id: "b4", name: "Mortgage", emoji: "🏠", group: "Housing", budgetAmount: 3550, actualAmount: 3566 },
-    { id: "b5", name: "Gas & Electric", emoji: "⚡️", group: "Bills", budgetAmount: 120, actualAmount: 0 },
-    { id: "b6", name: "Internet & Cable", emoji: "🌐", group: "Bills", budgetAmount: 70, actualAmount: 0 },
-    { id: "b7", name: "Fitness", emoji: "💪", group: "Health", budgetAmount: 60, actualAmount: 0 },
+    { id: "b3", name: "Rent", emoji: "🏠", group: "Housing", budgetAmount: 1850, actualAmount: 1850 },
+    { id: "b5", name: "Utilities", emoji: "⚡️", group: "Bills", budgetAmount: 180, actualAmount: 165 },
+    { id: "b6", name: "Internet", emoji: "🌐", group: "Bills", budgetAmount: 75, actualAmount: 75 },
+    { id: "b7", name: "Gym Membership", emoji: "💪", group: "Health", budgetAmount: 40, actualAmount: 39.99 },
   ]},
   { id: "flex", name: "Flexible", type: "flexible", categories: [
-    { id: "b8", name: "Restaurants & Bars", emoji: "🍽", group: "Food & Dining", budgetAmount: 0, actualAmount: 695 },
-    { id: "b9", name: "Shopping", emoji: "🛍", group: "Shopping", budgetAmount: 0, actualAmount: 352 },
-    { id: "b10", name: "Groceries", emoji: "🍏", group: "Food & Dining", budgetAmount: 0, actualAmount: 161 },
-    { id: "b11", name: "Coffee Shops", emoji: "☕️", group: "Food & Dining", budgetAmount: 0, actualAmount: 20 },
+    { id: "b8", name: "Groceries", emoji: "🛒", group: "Food & Dining", budgetAmount: 600, actualAmount: 520.40 },
+    { id: "b9", name: "Restaurants", emoji: "🍽", group: "Food & Dining", budgetAmount: 300, actualAmount: 385.20 },
+    { id: "b10", name: "Shopping", emoji: "🛍", group: "Shopping", budgetAmount: 250, actualAmount: 318.75 },
+    { id: "b11", name: "Coffee", emoji: "☕️", group: "Food & Dining", budgetAmount: 50, actualAmount: 34.25 },
   ]},
   { id: "nonmo", name: "Non-Monthly", type: "nonMonthly", categories: [
-    { id: "b12", name: "Travel & Vacation", emoji: "🏝", group: "Travel", budgetAmount: 900, actualAmount: 0 },
-    { id: "b13", name: "Medical", emoji: "💊", group: "Health", budgetAmount: 130, actualAmount: 107 },
+    { id: "b12", name: "Travel", emoji: "🏝", group: "Travel", budgetAmount: 200, actualAmount: 0 },
   ]},
 ];
 
 export const recurringItems: RecurringItem[] = [
-  { id: "r1", merchantName: "San Diego Gas & Electric", frequency: "Every month", nextDate: "Apr 23", accountName: "360 Checking", category: { name: "Gas & Electric", emoji: "⚡️" }, amount: 116.58, isComplete: false },
-  { id: "r2", merchantName: "Cox Communications", frequency: "Every month", nextDate: "Apr 24", accountName: "360 Checking", category: { name: "Internet & Cable", emoji: "🌐" }, amount: 70.00, isComplete: false },
-  { id: "r3", merchantName: "Paramount+", frequency: "Every month", nextDate: "Apr 26", accountName: "Credit Card ...7540", category: { name: "Entertainment", emoji: "🎥" }, amount: 13.99, isComplete: false },
-  { id: "r4", merchantName: "Bilt Rewards", frequency: "Every month", nextDate: "Apr 2", accountName: "360 Checking", category: { name: "Mortgage", emoji: "🏠" }, amount: 3566.16, isComplete: true },
-  { id: "r5", merchantName: "Ally Bank", frequency: "Every month", nextDate: "Apr 10", accountName: "360 Checking", category: { name: "Auto Payment", emoji: "🚗" }, amount: 351.34, isComplete: true },
+  { id: "r1", merchantName: "Electric Company", frequency: "Every month", nextDate: "Apr 20", accountName: "Everyday Checking", category: { name: "Utilities", emoji: "⚡️" }, amount: 95.50, isComplete: false },
+  { id: "r2", merchantName: "Internet Provider", frequency: "Every month", nextDate: "Apr 22", accountName: "Everyday Checking", category: { name: "Utilities", emoji: "🌐" }, amount: 75.00, isComplete: false },
+  { id: "r3", merchantName: "Streaming Service", frequency: "Every month", nextDate: "Apr 25", accountName: "Rewards Card", category: { name: "Entertainment", emoji: "🎬" }, amount: 15.99, isComplete: false },
+  { id: "r4", merchantName: "Rent Payment", frequency: "Every month", nextDate: "May 1", accountName: "Everyday Checking", category: { name: "Housing", emoji: "🏠" }, amount: 1850.00, isComplete: true },
+  { id: "r5", merchantName: "Gym Membership", frequency: "Every month", nextDate: "Apr 15", accountName: "Rewards Card", category: { name: "Fitness", emoji: "💪" }, amount: 39.99, isComplete: true },
 ];
 
 export const holdingGroups: HoldingGroup[] = [
-  { id: "h1", accountName: "Individual Brokerage", holdings: [
-    { id: "h1a", ticker: "SWPPX", name: "Schwab S&P 500 Index", price: 17.52, quantity: 340.53, value: 5966.02, weight: 9.52, costBasis: 3739.62, performance3M: -2.01 },
-    { id: "h1b", ticker: "NVDA", name: "NVIDIA Corporation", price: 188.75, quantity: 3.0, value: 566.25, weight: 0.90, costBasis: 203.02, performance3M: 2.00 },
-    { id: "h1c", ticker: "AAPL", name: "Apple Inc.", price: 260.48, quantity: 1, value: 260.48, weight: 0.42, costBasis: 129.47, performance3M: 0.09 },
+  { id: "demo-h1", accountName: "Sample Brokerage", holdings: [
+    { id: "demo-h1a", ticker: "VTI", name: "Total US Stock Market ETF", price: 245.30, quantity: 42.0, value: 10302.60, weight: 56.5, costBasis: 9200.00, performance3M: 2.8 },
+    { id: "demo-h1b", ticker: "VXUS", name: "Total International Stock ETF", price: 58.12, quantity: 85.0, value: 4940.20, weight: 27.1, costBasis: 4700.00, performance3M: 1.2 },
+    { id: "demo-h1c", ticker: "BND", name: "Total Bond Market ETF", price: 72.85, quantity: 40.75, value: 2968.62, weight: 16.3, costBasis: 3000.00, performance3M: -0.5 },
   ]},
-  { id: "h2", accountName: "Roth IRA", holdings: [
-    { id: "h2a", ticker: "SWTSX", name: "Schwab Total Stock Market", price: 16.42, quantity: 357.51, value: 5870.28, weight: 9.36, costBasis: 3846.44, performance3M: -2.03 },
-    { id: "h2b", ticker: "XAR", name: "SPDR S&P Aerospace & Defense", price: 267.81, quantity: 2.07, value: 553.88, weight: 0.88, costBasis: 191.34, performance3M: 4.66 },
-    { id: "h2c", ticker: "NVDA", name: "NVIDIA Corporation", price: 188.75, quantity: 10.02, value: 1891.30, weight: 3.02, costBasis: 678.10, performance3M: 2.00 },
-  ]},
-  { id: "h3", accountName: "401(k) Plan", holdings: [
-    { id: "h3a", ticker: "SP500", name: "S&P 500 Index Fund Cl C", price: 324.95, quantity: 47.25, value: 15355.19, weight: 24.49, costBasis: 14000, performance3M: null },
-    { id: "h3b", ticker: "TGT2060", name: "Target Retirement 2060", price: 23.63, quantity: 684.27, value: 16169.18, weight: 25.79, costBasis: 15000, performance3M: null },
+  { id: "demo-h2", accountName: "Roth IRA", holdings: [
+    { id: "demo-h2a", ticker: "VTI", name: "Total US Stock Market ETF", price: 245.30, quantity: 65.0, value: 15944.50, weight: 72.1, costBasis: 14500.00, performance3M: 2.8 },
+    { id: "demo-h2b", ticker: "VXUS", name: "Total International Stock ETF", price: 58.12, quantity: 106.0, value: 6160.72, weight: 27.9, costBasis: 5900.00, performance3M: 1.2 },
   ]},
 ];
 
 export const benchmarks: Benchmark[] = [
-  { id: "port", name: "Your Portfolio", performance3M: -7.04, color: "#E5633A" },
-  { id: "sp", name: "S&P 500", performance3M: -2.28, color: "#4D8FDB" },
-  { id: "us", name: "US Stocks", performance3M: -2.33, color: "#2B8A3E" },
-  { id: "bonds", name: "US Bonds", performance3M: -0.79, color: "#E03131" },
+  { id: "port", name: "Your Portfolio", performance3M: 2.6, color: "#E5633A" },
+  { id: "sp", name: "S&P 500", performance3M: 2.8, color: "#4D8FDB" },
+  { id: "us", name: "US Stocks", performance3M: 2.5, color: "#2B8A3E" },
+  { id: "bonds", name: "US Bonds", performance3M: -0.5, color: "#E03131" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -358,58 +359,54 @@ export function getLiabilitiesTotal(): number {
 }
 
 export const monthlyData = [
-  { month: 'Nov', income: 6800, expenses: 5200 },
-  { month: 'Dec', income: 7200, expenses: 6100 },
-  { month: 'Jan', income: 6500, expenses: 5400 },
-  { month: 'Feb', income: 7100, expenses: 5800 },
-  { month: 'Mar', income: 7300, expenses: 5500 },
-  { month: 'Apr', income: 6869.91, expenses: 5006.95 },
+  { month: 'Nov', income: 6400, expenses: 4500 },
+  { month: 'Dec', income: 6400, expenses: 5200 },
+  { month: 'Jan', income: 6800, expenses: 4100 },
+  { month: 'Feb', income: 6400, expenses: 3900 },
+  { month: 'Mar', income: 6400, expenses: 4300 },
+  { month: 'Apr', income: 6800, expenses: 3810 },
 ];
 
 export const reportData = {
   transactions: [
-    { merchant: 'Whole Foods', category: 'Groceries', amount: -127.43 },
-    { merchant: 'Shell Gas', category: 'Transportation', amount: -58.20 },
-    { merchant: 'Amazon', category: 'Shopping', amount: -234.99 },
-    { merchant: 'Netflix', category: 'Entertainment', amount: -15.99 },
-    { merchant: 'Starbucks', category: 'Dining', amount: -6.45 },
-    { merchant: 'Target', category: 'Shopping', amount: -89.50 },
-    { merchant: 'Employer', category: 'Income', amount: 4500.00 },
-    { merchant: 'Freelance Client', category: 'Income', amount: 1200.00 },
-    { merchant: 'Electric Company', category: 'Utilities', amount: -142.30 },
-    { merchant: 'Gym Membership', category: 'Health', amount: -49.99 },
+    { merchant: 'Grocery Store', category: 'Groceries', amount: -87.40 },
+    { merchant: 'Gas Station', category: 'Transportation', amount: -42.18 },
+    { merchant: 'Online Retailer', category: 'Shopping', amount: -48.20 },
+    { merchant: 'Streaming Service', category: 'Entertainment', amount: -15.99 },
+    { merchant: 'Coffee Shop', category: 'Dining', amount: -5.75 },
+    { merchant: 'Employer Payroll', category: 'Income', amount: 3200.00 },
+    { merchant: 'Rent Payment', category: 'Housing', amount: -1850.00 },
+    { merchant: 'Gym Membership', category: 'Health', amount: -39.99 },
+    { merchant: 'Ride Share', category: 'Transportation', amount: -12.50 },
   ],
 };
 
 export const recurringData = {
   income: [
-    { merchant: 'Employer Direct Deposit', amount: 4500, frequency: 'Bi-weekly', status: 'paid', nextDate: 'Apr 18', daysUntil: 7, emoji: '💼', category: 'Salary', dueDate: '1st & 15th' },
-    { merchant: 'Freelance Client', amount: 1200, frequency: 'Monthly', status: 'upcoming', nextDate: 'Apr 30', daysUntil: 19, emoji: '💻', category: 'Freelance', dueDate: '30th' },
+    { merchant: 'Employer Payroll', amount: 3200, frequency: 'Bi-weekly', status: 'paid', nextDate: 'Apr 24', daysUntil: 11, emoji: '💼', category: 'Income', dueDate: '10th & 24th' },
   ],
   expenses: [
-    { merchant: 'Rent Payment', amount: 1800, dueDate: '1st', category: 'Housing', status: 'paid', nextDate: 'May 1', daysUntil: 20, emoji: '🏠', frequency: 'Monthly' },
-    { merchant: 'Car Insurance', amount: 145, dueDate: '5th', category: 'Insurance', status: 'paid', nextDate: 'May 5', daysUntil: 24, emoji: '🚗', frequency: 'Monthly' },
-    { merchant: 'Netflix', amount: 15.99, dueDate: '10th', category: 'Entertainment', status: 'paid', nextDate: 'May 10', daysUntil: 29, emoji: '🎬', frequency: 'Monthly' },
-    { merchant: 'Spotify', amount: 9.99, dueDate: '12th', category: 'Entertainment', status: 'paid', nextDate: 'May 12', daysUntil: 31, emoji: '🎵', frequency: 'Monthly' },
-    { merchant: 'Gym Membership', amount: 49.99, dueDate: '15th', category: 'Health', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '🏋️', frequency: 'Monthly' },
-    { merchant: 'Internet Provider', amount: 79.99, dueDate: '18th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 18', daysUntil: 7, emoji: '🌐', frequency: 'Monthly' },
-    { merchant: 'Phone Bill', amount: 85, dueDate: '20th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 20', daysUntil: 9, emoji: '📱', frequency: 'Monthly' },
-    { merchant: 'Student Loan', amount: 350, dueDate: '25th', category: 'Loans', status: 'upcoming', nextDate: 'Apr 25', daysUntil: 14, emoji: '🎓', frequency: 'Monthly' },
+    { merchant: 'Rent Payment', amount: 1850, dueDate: '1st', category: 'Housing', status: 'paid', nextDate: 'May 1', daysUntil: 18, emoji: '🏠', frequency: 'Monthly' },
+    { merchant: 'Streaming Service', amount: 15.99, dueDate: '11th', category: 'Entertainment', status: 'paid', nextDate: 'May 11', daysUntil: 28, emoji: '🎬', frequency: 'Monthly' },
+    { merchant: 'Gym Membership', amount: 39.99, dueDate: '8th', category: 'Health', status: 'paid', nextDate: 'May 8', daysUntil: 25, emoji: '💪', frequency: 'Monthly' },
+    { merchant: 'Internet Provider', amount: 75.00, dueDate: '22nd', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 22', daysUntil: 9, emoji: '🌐', frequency: 'Monthly' },
+    { merchant: 'Electric Company', amount: 95.50, dueDate: '20th', category: 'Utilities', status: 'upcoming', nextDate: 'Apr 20', daysUntil: 7, emoji: '⚡', frequency: 'Monthly' },
   ],
   creditCards: [
-    { merchant: 'Chase Sapphire', amount: 1250, dueDate: '15th', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 15', daysUntil: 4, emoji: '💳', frequency: 'Monthly' },
-    { merchant: 'Amex Gold', amount: 680, dueDate: '22nd', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 22', daysUntil: 11, emoji: '💳', frequency: 'Monthly' },
+    { merchant: 'Rewards Card Payment', amount: 520, dueDate: '18th', category: 'Credit Card', status: 'upcoming', nextDate: 'Apr 18', daysUntil: 5, emoji: '💳', frequency: 'Monthly' },
   ],
 };
 
 export function generateNetWorthTimeline(): { date: string; value: number }[] {
+  // Generic upward trend for demo mode — not based on any real account
   const points = [];
+  const start = 55000;
   for (let i = 0; i <= 30; i++) {
     const d = new Date();
     d.setDate(d.getDate() - 30 + i);
     points.push({
       date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      value: 62000 + i * 60 + (Math.random() - 0.5) * 1000,
+      value: start + i * 75 + (Math.random() - 0.5) * 800,
     });
   }
   return points;

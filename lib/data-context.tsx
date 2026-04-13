@@ -369,9 +369,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [splits, setSplits] = useState<Record<string, TransactionSplit>>({});
   const [manualAccounts, setManualAccounts] = useState<ManualAccount[]>([]);
 
-  // Use mock data if not logged in OR if logged in but no real data was fetched
-  const hasRealData = accounts.length > 0 || rawTransactions.length > 0;
-  const isUsingMockData = !user || (!hasRealData && !isLoading);
+  // Mock data is ONLY shown to unauthenticated users (never leaks between real users).
+  // When authenticated but no Plaid data yet, pages show their own empty states.
+  const isUsingMockData = !user;
 
   // Phase 1: Compute transfer IDs once, then apply user overrides
   const transferIds = useMemo(() => {

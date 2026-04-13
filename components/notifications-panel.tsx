@@ -10,13 +10,11 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   CreditCard, AlertTriangle, TrendingUp, PiggyBank, CheckCircle2, Bell,
 };
 
-// Fallback notifications for unauthenticated users
+// Demo notifications for unauthenticated users — signed-in users get real data
 const fallbackNotifications = [
-  { id: 1, iconName: 'CreditCard', iconBg: 'bg-red-50', iconColor: 'text-red-500', title: 'Large transaction detected', description: 'A $1,250 charge at Best Buy was posted to your Chase Sapphire.', time: '2 hours ago', unread: true },
-  { id: 2, iconName: 'AlertTriangle', iconBg: 'bg-amber-50', iconColor: 'text-amber-500', title: 'Budget limit approaching', description: 'You\'ve used 92% of your Dining Out budget for April.', time: '5 hours ago', unread: true },
-  { id: 3, iconName: 'TrendingUp', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', title: 'Portfolio up 2.3% this week', description: 'Your investments gained $2,580 in the past 7 days.', time: '1 day ago', unread: false },
-  { id: 4, iconName: 'PiggyBank', iconBg: 'bg-blue-50', iconColor: 'text-blue-500', title: 'Emergency Fund milestone', description: 'You\'ve reached 70% of your emergency fund goal!', time: '2 days ago', unread: false },
-  { id: 5, iconName: 'CheckCircle2', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', title: 'Bill paid successfully', description: 'Your rent payment of $1,800 was processed.', time: '3 days ago', unread: false },
+  { id: 1, iconName: 'Sparkles', iconBg: 'bg-flourish-orange/10', iconColor: 'text-flourish-orange', title: 'Welcome to Flourish', description: 'Sign in to see real-time notifications about your spending, budgets, and portfolio.', time: 'Just now', unread: true },
+  { id: 2, iconName: 'TrendingUp', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-500', title: 'Demo: spending alert', description: 'Example — when a category crosses 80% of its budget, you\'ll see it here.', time: 'Demo', unread: false },
+  { id: 3, iconName: 'PiggyBank', iconBg: 'bg-blue-50', iconColor: 'text-blue-500', title: 'Demo: goal milestone', description: 'Example — when you cross a goal milestone like 50% or 75% funded.', time: 'Demo', unread: false },
 ];
 
 export function NotificationsPanel({
