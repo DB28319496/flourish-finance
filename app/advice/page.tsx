@@ -6,6 +6,7 @@ import {
   ChevronRight, ThumbsDown, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 import { Card, Badge } from '@/components/ui';
+import { SubscriptionAuditCard } from '@/components/ai-insight-cards';
 import { useData } from '@/lib/data-context';
 import { cn } from '@/lib/utils';
 import type { ComputedInsight } from '@/lib/compute-finance';
@@ -99,6 +100,11 @@ export default function AdvicePage() {
               ${potentialSavings.toFixed(2)}
             </p>
           </Card>
+        </div>
+
+        {/* Subscription Audit */}
+        <div className="mb-6">
+          <SubscriptionAuditCard />
         </div>
 
         {/* Insights */}

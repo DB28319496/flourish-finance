@@ -771,6 +771,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
+    // Holdings across all accounts
+    const allHoldings = holdingGroups.flatMap((g) =>
+      g.holdings.map((h) => ({ ...h, accountName: g.accountName }))
+    );
+
     const financialContext = `
 **Net Worth Snapshot**
 - Net Worth: $${(totalAssets - totalLiabilities).toFixed(2)}
@@ -778,7 +783,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 - Total Liabilities: $${totalLiabilities.toFixed(2)}
 - Savings Rate (${monthName}): ${monthIncome > 0 ? (((monthIncome - monthSpending) / monthIncome) * 100).toFixed(1) : "0"}%
 
-**Accounts by Type** (account_id shown in brackets — use for hide_account tool)
+**Accounts by Type** (account_id in brackets — use for hide_account tool)
 ${Object.entries(accountsByType).map(([type, accts]) => {
   const total = accts.reduce((s, a) => s + (a.current_balance || 0), 0);
   return `${type} ($${total.toFixed(2)} total):\n${accts.map((a) => `  - [${a.account_id}] ${a.name}${(a as any).mask ? ` ...${(a as any).mask}` : ""}: $${(a.current_balance || 0).toFixed(2)}${(a as any).limit ? ` (limit: $${(a as any).limit})` : ""}`).join("\n")}`;
@@ -797,11 +802,27 @@ ${Object.entries(spendByCategory)
   .map(([cat, amount]) => `- ${cat}: $${amount.toFixed(2)} (${((amount / monthSpending) * 100).toFixed(1)}%)`)
   .join("\n")}
 
-**Recent Notable Transactions**
-${topTxs.map((t) => `- ${t.date}: ${t.merchant_name || t.name} — ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)} [${t.category?.[0] || "Other"}]`).join("\n")}
+**Investment Holdings**
+${allHoldings.length === 0 ? "(none yet — may require reconnecting with Plaid Investments product)" :
+  allHoldings.map((h) => `- ${h.ticker} (${h.name}) in ${h.accountName}: ${h.quantity.toFixed(4)} shares, $${h.value.toFixed(2)} value, $${(h.costBasis || 0).toFixed(2)} cost basis${h.costBasis > 0 ? ` (${(((h.value - h.costBasis) / h.costBasis) * 100).toFixed(1)}% return)` : ""}`).join("\n")}
 
-**Last 30 Transactions**
-${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.name} ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)}`).join("\n")}
+**Goals**
+${goals.length === 0 ? "(none)" :
+  goals.map((g) => `- [${g.id}] ${g.name} (${g.icon || "🎯"}): $${g.current}/$${g.target} (${((g.current / (g.target || 1)) * 100).toFixed(0)}%), target ${g.deadline}, $${g.monthlyContribution}/mo`).join("\n")}
+
+**Active Budget Targets**
+${Object.keys(budgetTargets).length === 0 ? "(none set)" :
+  Object.entries(budgetTargets).map(([cat, amount]) => `- ${cat}: $${amount}/mo`).join("\n")}
+
+**Auto-categorization Rules**
+${rules.length === 0 ? "(none)" :
+  rules.map((r) => `- When merchant contains "${r.merchantPattern}" → ${r.setCategory ? `category=${r.setCategory}` : ""}${r.setRecurring ? ", recurring" : ""}${r.setFlag ? ", flag" : ""}`).join("\n")}
+
+**Recent Notable Transactions**
+${topTxs.map((t) => `- ${t.date}: [${t.transaction_id}] ${t.merchant_name || t.name} — ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)} [${t.category?.[0] || "Other"}]`).join("\n")}
+
+**Last 30 Transactions** (tx_id in brackets — use for update_transaction tool)
+${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${t.merchant_name || t.name} ${t.amount > 0 ? "-" : "+"}$${Math.abs(t.amount).toFixed(2)}`).join("\n")}
     `.trim();
 
     const data = await apiFetch("/api/chat", token, {
@@ -810,7 +831,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: ${t.merchant_name || t.n
       financialContext,
     });
     return { response: data.response, actions: data.actions || [] };
-  }, [getIdToken, accounts, rawTransactions]);
+  }, [getIdToken, accounts, rawTransactions, holdingGroups, goals, budgetTargets, rules]);
 
   // Refresh all user-specific Firestore data (used after AI actions)
   const refreshAllUserData = useCallback(async () => {

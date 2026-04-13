@@ -6,6 +6,8 @@ import { ChevronDown, TrendingUp, TrendingDown, AlertTriangle, BarChart3, PieCha
 import { Card, PillToggle, Badge, Dropdown } from '@/components/ui';
 import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { HoldingDetailDrawer } from '@/components/holding-detail-drawer';
+import { PortfolioAICard } from '@/components/portfolio-ai-card';
+import { TaxOpportunitiesCard } from '@/components/ai-insight-cards';
 import { useData } from '@/lib/data-context';
 import { useQuotes, useHistory, useNews, formatRelativeTime } from '@/lib/use-market-data';
 import { ExternalLink } from 'lucide-react';
@@ -541,6 +543,12 @@ export default function InvestmentsPage() {
         {/* Insights View (Perplexity Finance style) */}
         {viewType === 'insights' && (
           <div className="space-y-6">
+            {/* AI Portfolio Analysis */}
+            <PortfolioAICard />
+
+            {/* Tax-Loss Opportunities */}
+            <TaxOpportunitiesCard />
+
             {/* Portfolio Movers */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Top Gainers */}

@@ -8,6 +8,7 @@ import {
   AlertTriangle, Sparkles, CreditCard, Wallet, Target, Calendar,
 } from 'lucide-react';
 import { Card, Badge, Skeleton, SkeletonCard } from '@/components/ui';
+import { WeeklyBriefCard } from '@/components/weekly-brief-card';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
@@ -202,6 +203,9 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </div>
       </Card>
+
+      {/* Weekly AI Brief */}
+      <WeeklyBriefCard />
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
