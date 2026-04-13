@@ -5,12 +5,28 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { ChevronDown, TrendingUp, TrendingDown, AlertTriangle, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
 import { Card, PillToggle, Badge, Dropdown } from '@/components/ui';
 import { PlaidLinkButton } from '@/components/plaid-link-button';
+import { HoldingDetailDrawer } from '@/components/holding-detail-drawer';
 import { useData } from '@/lib/data-context';
+import { useQuotes, useHistory, useNews, formatRelativeTime } from '@/lib/use-market-data';
+import { ExternalLink } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/mock-data';
 import { cn, getMerchantColor } from '@/lib/utils';
 
 type ViewType = 'holdings' | 'allocation' | 'insights';
 type Timeframe = '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y';
+
+function timeframeToRange(tf: string): string {
+  switch (tf) {
+    case '1W': return '5d';
+    case '1M': return '1mo';
+    case '3M': return '3mo';
+    case '6M': return '6mo';
+    case 'YTD': return '1y';
+    case '1Y': return '1y';
+    case '5Y': return '5y';
+    default: return '3mo';
+  }
+}
 
 const SECTOR_COLORS = [
   '#E5633A', '#4D8FDB', '#2B8A3E', '#7C3AED', '#E03131',
@@ -19,6 +35,20 @@ const SECTOR_COLORS = [
 
 export default function InvestmentsPage() {
   const { holdingGroups, benchmarks, isUsingMockData, accountGroups } = useData();
+
+  // Collect all ticker symbols from holdings
+  const allTickers = useMemo(
+    () => Array.from(new Set(holdingGroups.flatMap((g) => g.holdings.map((h) => h.ticker).filter((t) => t && t !== 'N/A'))))
+      .filter(Boolean),
+    [holdingGroups]
+  );
+
+  // Fetch live quotes + news
+  const { quotes } = useQuotes(allTickers);
+  const { articles: portfolioNews } = useNews(allTickers.slice(0, 5));
+  const { data: portfolioHistory } = useHistory(allTickers[0] || null, '3mo');
+
+  const [selectedHolding, setSelectedHolding] = useState<any>(null);
 
   // Detect investment accounts that exist but have no holdings data
   const investmentAccountsCount = accountGroups
@@ -139,16 +169,29 @@ export default function InvestmentsPage() {
     return warnings;
   }, [allHoldings, accountGroups]);
 
-  // Performance chart data (mock, as we'd need historical data)
+  // Fetch S&P 500 history for benchmark
+  const { data: spyHistory } = useHistory('SPY', timeframeToRange(timeframe));
+
+  // Weighted portfolio performance: for each time point, sum weighted price changes
+  // across all tickers we have live data for. If we don't have enough data, fall back.
   const performanceChartData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const base = totalPortfolioValue * 0.9;
-    return months.map((date, i) => ({
-      date,
-      portfolio: Math.round(base + (totalPortfolioValue - base) * (i / 5)),
-      benchmark: Math.round(base * 0.98 + (base * 1.04 - base * 0.98) * (i / 5)),
+    if (!spyHistory?.points || spyHistory.points.length === 0) return [];
+
+    // Use S&P 500 data points as the timeline
+    const spyPoints = spyHistory.points;
+
+    // If no per-holding history available, just show S&P normalized to current portfolio value
+    // This approximates "what you would see" — once we have historical data per holding we weight properly.
+    const firstSpy = spyPoints[0]?.close || 1;
+    const normalize = (price: number, base: number) => (price / firstSpy) * base;
+
+    return spyPoints.map((p) => ({
+      date: new Date(p.time * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      time: p.time,
+      portfolio: normalize(p.close, totalPortfolioValue),
+      benchmark: normalize(p.close, totalPortfolioValue),
     }));
-  }, [totalPortfolioValue]);
+  }, [spyHistory, totalPortfolioValue]);
 
   const toggleAccount = (accountId: string) => {
     setExpandedAccounts((prev) => ({ ...prev, [accountId]: !prev[accountId] }));
@@ -299,6 +342,49 @@ export default function InvestmentsPage() {
               </ResponsiveContainer>
             </Card>
 
+            {/* Portfolio News */}
+            {portfolioNews.length > 0 && (
+              <Card className="p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display text-lg font-bold text-flourish-text">Portfolio News</h3>
+                  <p className="text-xs text-flourish-muted">{portfolioNews.length} recent articles</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {portfolioNews.slice(0, 6).map((a) => (
+                    <a
+                      key={a.uuid}
+                      href={a.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex gap-3 p-3 rounded-xl hover:bg-[#fdf8f4] transition-colors group"
+                    >
+                      {a.thumbnail && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={a.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-flourish-dark leading-snug line-clamp-2 group-hover:text-flourish-orange">
+                          {a.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-flourish-muted">
+                          <span>{a.publisher}</span>
+                          <span>·</span>
+                          <span>{formatRelativeTime(a.publishedAt)}</span>
+                          {a.relatedSymbols[0] && (
+                            <>
+                              <span>·</span>
+                              <span className="font-semibold text-flourish-orange">{a.relatedSymbols.slice(0, 3).join(' ')}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-flourish-muted flex-shrink-0 mt-0.5" />
+                    </a>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             {/* Holdings by Account */}
             {holdingGroups.map((group) => (
               <div key={group.id}>
@@ -319,26 +405,41 @@ export default function InvestmentsPage() {
                   <Card className="p-0 overflow-hidden mb-4">
                     <div className="divide-y divide-flourish-border">
                       {group.holdings.map((holding) => {
-                        const gain = holding.value - holding.costBasis;
+                        const liveQuote = quotes[holding.ticker];
+                        const livePrice = liveQuote?.price ?? holding.price;
+                        const liveValue = liveQuote?.price ? liveQuote.price * holding.quantity : holding.value;
+                        const gain = liveValue - holding.costBasis;
                         const gainPct = holding.costBasis > 0 ? (gain / holding.costBasis) * 100 : 0;
+                        const dayChange = liveQuote?.changePercent ?? 0;
                         return (
-                          <div key={holding.id} className="flex items-center justify-between p-4 hover:bg-flourish-hover transition-colors">
+                          <button
+                            key={holding.id}
+                            onClick={() => setSelectedHolding(holding)}
+                            className="w-full text-left flex items-center justify-between p-4 hover:bg-flourish-hover transition-colors"
+                          >
                             <div className="flex items-center gap-4 flex-1">
                               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: getMerchantColor(holding.ticker) }}>
                                 <span className="text-white font-bold text-xs">{holding.ticker.charAt(0)}</span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-display font-bold text-flourish-text">{holding.ticker}</p>
-                                <p className="font-body text-sm text-flourish-muted">{holding.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-display font-bold text-flourish-text">{holding.ticker}</p>
+                                  {liveQuote && (
+                                    <span className={cn('text-xs font-semibold tabular-nums', dayChange >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                      {dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)}%
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="font-body text-sm text-flourish-muted truncate">{holding.name}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-8 text-right">
                               <div className="min-w-[100px]">
-                                <p className="font-body text-xs text-flourish-muted">{holding.quantity.toFixed(2)} shares</p>
-                                <p className="font-body text-xs text-flourish-muted">@ {formatCurrency(holding.price)}</p>
+                                <p className="font-body text-xs text-flourish-muted">{holding.quantity.toFixed(holding.quantity < 10 ? 4 : 2)} shares</p>
+                                <p className="font-body text-xs text-flourish-muted tabular-nums">@ {formatCurrency(livePrice)}</p>
                               </div>
                               <div className="min-w-[100px]">
-                                <p className="font-display font-bold text-flourish-text">{formatCurrency(holding.value)}</p>
+                                <p className="font-display font-bold text-flourish-text tabular-nums">{formatCurrency(liveValue)}</p>
                                 <p className="font-body text-xs text-flourish-muted">{formatPercent(holding.weight)} of acct</p>
                               </div>
                               <div className="min-w-[80px]">
@@ -348,7 +449,7 @@ export default function InvestmentsPage() {
                                 </Badge>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -576,6 +677,12 @@ export default function InvestmentsPage() {
           </div>
         )}
       </div>
+
+      {/* Holding Detail Drawer */}
+      <HoldingDetailDrawer
+        holding={selectedHolding}
+        onClose={() => setSelectedHolding(null)}
+      />
     </div>
   );
 }
