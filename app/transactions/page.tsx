@@ -13,6 +13,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Card, PillToggle, Dropdown, Badge } from "@/components/ui";
+import { MerchantLogo } from "@/components/merchant-logo";
 import {
   formatCurrency,
   type Transaction,
@@ -233,106 +234,84 @@ export default function TransactionsPage() {
       )}
 
       {/* Transaction Groups */}
-      <div className="space-y-6">
-        {groupsWithTotals.map((group, groupIndex) => (
-          <div key={group.id} className="space-y-3">
-            {/* Date Header with Daily Total */}
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-sm font-semibold text-flourish-text">
+      {/* Monarch-style transaction table */}
+      <div className="bg-white rounded-xl border border-flourish-border overflow-hidden">
+        {groupsWithTotals.map((group) => (
+          <div key={group.id}>
+            {/* Date Header Row */}
+            <div className="flex items-center justify-between px-5 py-2 bg-flourish-bg/60 border-t border-flourish-border text-xs font-medium">
+              <span className="text-flourish-secondary">
                 {formatDate(group.date)}
-              </h2>
-              <span className="text-sm font-medium text-flourish-secondary">
+              </span>
+              <span className="text-flourish-secondary tabular-nums">
                 {formatCurrency(group.total)}
               </span>
             </div>
 
-            {/* Transactions */}
-            <div className="space-y-2">
-              {group.transactions.map((transaction, txIndex) => {
-                const merchantColor = getMerchantColor(transaction.merchantName);
-                const accountColor = getAccountColor(transaction.accountId);
-
-                return (
-                  <button
-                    key={transaction.id}
-                    onClick={() => handleDetailClick(transaction)}
-                    className={cn(
-                      "w-full animate-slide-up rounded-lg bg-flourish-card p-4 transition-all hover:shadow-flourish-hover",
-                      groupIndex < 2 && `stagger-${Math.min(txIndex + 1, 6)}`
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      {/* Left Side: Merchant Info */}
-                      <div className="flex flex-1 items-center gap-3 min-w-0">
-                        {/* Merchant Initial Circle */}
-                        <div
-                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                          style={{ backgroundColor: merchantColor }}
-                        >
-                          <span className="text-xs font-bold text-white">
-                            {transaction.merchantName.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-
-                        {/* Merchant Name and Category */}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-flourish-text truncate">
-                            {transaction.merchantName}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-flourish-secondary">
-                              {transaction.category.emoji} {transaction.category.name}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Middle: Account */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: accountColor }}
-                        />
-                        <span className="text-xs text-flourish-secondary">
-                          {transaction.accountName}
-                        </span>
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {transaction.isPending && (
-                          <Badge variant="warning">
-                            <Clock className="h-3 w-3" />
-                            Pending
-                          </Badge>
-                        )}
-                        {transaction.isRecurring && (
-                          <Badge variant="default">
-                            <Repeat className="h-3 w-3" />
-                          </Badge>
-                        )}
-                        {transaction.isFlagged && (
-                          <Badge variant="danger">
-                            <Flag className="h-3 w-3" />
-                          </Badge>
-                        )}
-                        {((transaction as any).tags || []).slice(0, 2).map((tag: string) => (
-                          <Badge key={tag} variant="default">#{tag}</Badge>
-                        ))}
-                      </div>
-
-                      {/* Amount and Chevron */}
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className="font-mono text-sm font-semibold tabular-nums text-flourish-text">
-                          {formatCurrency(transaction.amount)}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-flourish-secondary flex-shrink-0" />
-                      </div>
+            {/* Transaction Rows */}
+            {group.transactions.map((transaction) => {
+              const accountColor = getAccountColor(transaction.accountId);
+              return (
+                <button
+                  key={transaction.id}
+                  onClick={() => handleDetailClick(transaction)}
+                  className="w-full flex items-center gap-4 px-5 py-2.5 hover:bg-flourish-hover/30 transition-colors border-t border-flourish-border text-left"
+                >
+                  {/* Merchant logo + name */}
+                  <div className="flex items-center gap-3 min-w-0" style={{ flex: '1 1 30%' }}>
+                    <MerchantLogo name={transaction.merchantName} size={32} />
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="text-sm font-medium text-flourish-text truncate">
+                        {transaction.merchantName}
+                      </p>
+                      {transaction.isPending && (
+                        <span className="text-[10px] text-flourish-muted">P</span>
+                      )}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                  </div>
+
+                  {/* Category */}
+                  <div className="flex items-center gap-1.5" style={{ flex: '1 1 20%' }}>
+                    <span className="text-base">{transaction.category.emoji}</span>
+                    <span className="text-sm text-flourish-secondary truncate">
+                      {transaction.category.name}
+                    </span>
+                  </div>
+
+                  {/* Account */}
+                  <div className="flex items-center gap-2 min-w-0" style={{ flex: '1 1 25%' }}>
+                    <div
+                      className="w-5 h-5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: accountColor }}
+                    />
+                    <span className="text-sm text-flourish-secondary truncate">
+                      {transaction.accountName}
+                    </span>
+                  </div>
+
+                  {/* Tags/flags (compact) */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {transaction.isRecurring && (
+                      <Repeat className="w-3.5 h-3.5 text-flourish-muted" />
+                    )}
+                    {transaction.isFlagged && (
+                      <Flag className="w-3.5 h-3.5 text-flourish-orange fill-flourish-orange" />
+                    )}
+                    {((transaction as any).tags || []).slice(0, 2).map((tag: string) => (
+                      <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-flourish-bg text-flourish-secondary">#{tag}</span>
+                    ))}
+                  </div>
+
+                  {/* Amount */}
+                  <div className="flex items-center gap-2 flex-shrink-0" style={{ minWidth: '100px', justifyContent: 'flex-end' }}>
+                    <span className="font-medium tabular-nums text-sm text-flourish-text">
+                      {formatCurrency(transaction.amount)}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-flourish-muted" />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         ))}
       </div>

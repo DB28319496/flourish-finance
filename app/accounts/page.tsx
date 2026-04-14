@@ -26,6 +26,7 @@ import {
 } from "@/components/ui";
 import { AccountDetailDrawer } from "@/components/account-detail-drawer";
 import { ManualAccountModal } from "@/components/manual-account-modal";
+import { MerchantLogo } from "@/components/merchant-logo";
 import type { ManualAccount } from "@/lib/mock-data";
 import {
   formatCurrency,
@@ -65,6 +66,23 @@ function formatLastSynced(timeStr: string): string {
   return timeStr;
 }
 
+// Stacked horizontal bar — used in summary sidebar for composition
+function StackedBar({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) return null;
+  return (
+    <div className="flex h-2 w-full rounded-full overflow-hidden bg-flourish-bg">
+      {segments.map((seg, i) => (
+        <div
+          key={i}
+          style={{ width: `${(seg.value / total) * 100}%`, backgroundColor: seg.color }}
+          title={`${seg.label}: ${seg.value}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function AccountsPage() {
   const {
     accountGroups,
@@ -81,6 +99,32 @@ export default function AccountsPage() {
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [manualAccountModal, setManualAccountModal] = useState<ManualAccount | null | 'new'>(null);
+  const [summaryMode, setSummaryMode] = useState<'totals' | 'percent'>('totals');
+
+  const handleDownloadCSV = () => {
+    const rows = [['Institution', 'Account', 'Type', 'Subtype', 'Balance']];
+    for (const g of accountGroups) {
+      for (const a of g.accounts) {
+        rows.push([
+          a.institution,
+          a.name,
+          g.label,
+          a.subtype,
+          String(a.balance),
+        ]);
+      }
+    }
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `flourish-accounts-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["cash", "invest", "credit", "depository", "investment", "loan"])
   );
@@ -131,18 +175,32 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {/* Net Worth Header Card */}
-      <Card className="animate-slide-up stagger-1">
-        <div className="space-y-6">
-          <div>
-            <SectionHeader title="Net Worth" />
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="font-display text-money-xl text-flourish-text tabular-nums">
-                {formatCurrency(netWorth)}
-              </span>
-              <span className="text-flourish-green text-sm font-medium">
-                +$2,413.22 (1 month)
-              </span>
+      {/* Net Worth Header Card — Monarch style */}
+      <Card className="animate-slide-up stagger-1 p-6">
+        <div className="space-y-4">
+          {/* Header row: NET WORTH label + controls */}
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-flourish-tertiary mb-1">Net Worth</p>
+              <div className="flex items-baseline gap-3">
+                <span className="font-display text-[32px] font-bold text-flourish-text tabular-nums leading-none">
+                  {formatCurrency(netWorth)}
+                </span>
+                <span className="text-sm font-medium text-flourish-secondary tabular-nums">
+                  <span className={netWorth >= 0 ? "text-flourish-green" : "text-flourish-red"}>
+                    {netWorth >= 0 ? "↗" : "↘"} +$0.00
+                  </span>
+                  <span className="ml-2 text-flourish-muted">(0.0%) 1 month</span>
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <button className="px-3 py-1.5 rounded-lg bg-flourish-bg text-flourish-secondary hover:bg-flourish-tertiary/10">
+                Net worth performance ▾
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-flourish-bg text-flourish-secondary hover:bg-flourish-tertiary/10">
+                1 month ▾
+              </button>
             </div>
           </div>
 
@@ -151,16 +209,12 @@ export default function AccountsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={netWorthTimeline}
-                margin={{ top: 12, right: 12, left: 8, bottom: 0 }}
+                margin={{ top: 5, right: 8, left: 8, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#E5633A" stopOpacity={0.15} />
-                    <stop
-                      offset="95%"
-                      stopColor="#E5633A"
-                      stopOpacity={0.01}
-                    />
+                    <stop offset="5%" stopColor="#4D8FDB" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#4D8FDB" stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -168,31 +222,33 @@ export default function AccountsPage() {
                   stroke="var(--flourish-tertiary)"
                   style={{ fontSize: "11px" }}
                   tick={{ fill: "var(--flourish-tertiary)" }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   stroke="var(--flourish-tertiary)"
                   style={{ fontSize: "11px" }}
                   tick={{ fill: "var(--flourish-tertiary)" }}
                   width={50}
-                  domain={["dataMin - 1000", "dataMax + 1000"]}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
+                  domain={["dataMin - 500", "dataMax + 500"]}
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(1)}K`}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "var(--flourish-card)",
-                    border: "1px solid var(--flourish-bg)",
+                    backgroundColor: "#fff",
+                    border: "1px solid #e5e7eb",
                     borderRadius: "12px",
-                    boxShadow:
-                      "0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04)",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                   }}
-                  formatter={(value) => [formatCurrency(value as number), "Value"]}
-                  labelStyle={{ color: "var(--flourish-text)" }}
+                  formatter={(value) => [formatCurrency(value as number), "Net Worth"]}
                 />
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#E5633A"
-                  strokeWidth={2}
+                  stroke="#4D8FDB"
+                  strokeWidth={2.5}
                   fillOpacity={1}
                   fill="url(#colorValue)"
                 />
@@ -203,90 +259,71 @@ export default function AccountsPage() {
       </Card>
 
       {/* Main Grid Layout: Accounts + Summary */}
-      <div className="grid gap-8 lg:grid-cols-[1fr_0.55fr]">
-        {/* Accounts Column */}
-        <div className="space-y-4">
-          {accountGroups.map((group, groupIndex) => (
-            <div
-              key={group.id}
-              className={cn(
-                "animate-slide-up",
-                `stagger-${Math.min(groupIndex + 2, 6)}`
-              )}
-            >
-              {/* Group Header */}
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className="w-full"
-              >
-                <Card hover className="transition-all">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-flourish-secondary">
-                        {getIconComponent(group.icon, "w-5 h-5")}
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-flourish-text">
-                          {group.label}
-                        </p>
-                        <p className="text-xs text-flourish-secondary">
-                          {group.accounts.length}{" "}
-                          {group.accounts.length === 1 ? "account" : "accounts"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-display text-money-md text-flourish-text tabular-nums">
-                        {formatCurrency(
-                          group.accounts.reduce((sum, a) => sum + a.balance, 0)
-                        )}
-                      </span>
-                      {expandedGroups.has(group.id) ? (
-                        <ChevronUp className="w-4 h-4 text-flourish-secondary" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-flourish-secondary" />
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        {/* Accounts Column — Monarch-style grouped list */}
+        <div className="space-y-3">
+          {accountGroups.map((group) => {
+            const groupTotal = group.accounts.reduce((s, a) => s + a.balance, 0);
+            const visibleTotal = group.accounts
+              .filter((a) => !hiddenAccountIds.has(a.id))
+              .reduce((s, a) => s + a.balance, 0);
+            const isExpanded = expandedGroups.has(group.id);
+
+            return (
+              <div key={group.id} className="bg-white rounded-xl border border-flourish-border overflow-hidden">
+                {/* Group Header */}
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-flourish-hover/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <ChevronDown
+                      className={cn(
+                        "w-4 h-4 text-flourish-secondary transition-transform",
+                        !isExpanded && "-rotate-90"
                       )}
-                    </div>
+                    />
+                    <span className="font-semibold text-flourish-text">{group.label}</span>
+                    <span className="text-xs text-flourish-muted">
+                      ({group.accounts.length})
+                    </span>
                   </div>
-                </Card>
-              </button>
+                  <span className="font-display text-base font-semibold text-flourish-text tabular-nums">
+                    {formatCurrency(visibleTotal)}
+                  </span>
+                </button>
 
-              {/* Expanded Account List */}
-              {expandedGroups.has(group.id) && (
-                <div className="space-y-2 mt-2">
-                  {group.accounts.map((account) => {
-                    const initialColor = getInitialColor(account.name);
-                    const creditUsagePercent =
-                      account.creditLimit && account.creditLimit > 0
-                        ? account.balance / account.creditLimit
-                        : 0;
+                {/* Account rows */}
+                {isExpanded && (
+                  <div className="border-t border-flourish-border">
+                    {group.accounts.map((account) => {
+                      const creditUsagePercent =
+                        account.creditLimit && account.creditLimit > 0
+                          ? account.balance / account.creditLimit
+                          : 0;
+                      const isHidden = hiddenAccountIds.has(account.id);
+                      const isManual = (account as any).isManual;
+                      const manualData = isManual ? manualAccounts.find((m) => m.id === account.id) : null;
 
-                    const isHidden = hiddenAccountIds.has(account.id);
-                    const isManual = (account as any).isManual;
-                    const manualData = isManual ? manualAccounts.find((m) => m.id === account.id) : null;
-                    return (
-                      <Card
-                        key={account.id}
-                        hover
-                        className={cn("p-4 cursor-pointer", isHidden && "opacity-60")}
-                        onClick={() => {
-                          if (isManual && manualData) {
-                            setManualAccountModal(manualData);
-                          } else {
-                            setSelectedAccountId(account.id);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* Account Initial Circle */}
-                          <div
-                            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                            style={{ backgroundColor: initialColor }}
-                          >
-                            {account.name.charAt(0).toUpperCase()}
-                          </div>
+                      return (
+                        <div
+                          key={account.id}
+                          className={cn(
+                            "group flex items-center gap-4 px-5 py-3 border-t border-flourish-border first:border-t-0 hover:bg-flourish-hover/20 transition-colors cursor-pointer",
+                            isHidden && "opacity-50"
+                          )}
+                          onClick={() => {
+                            if (isManual && manualData) {
+                              setManualAccountModal(manualData);
+                            } else {
+                              setSelectedAccountId(account.id);
+                            }
+                          }}
+                        >
+                          {/* Logo / institution initial */}
+                          <MerchantLogo name={account.institution || account.name} size={36} />
 
-                          {/* Account Info */}
+                          {/* Name + subtype */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium text-flourish-text truncate">
@@ -296,175 +333,177 @@ export default function AccountsPage() {
                                 <span className="text-[9px] font-semibold uppercase tracking-wider text-flourish-orange bg-flourish-orange/10 px-1.5 py-0.5 rounded">Manual</span>
                               )}
                             </div>
-                            <p className="text-xs text-flourish-secondary truncate">
+                            <p className="text-xs text-flourish-muted truncate">
                               {account.subtype}
                             </p>
                           </div>
 
                           {/* Sparkline */}
-                          {account.sparklineData.length > 0 && (
-                            <div className="flex-shrink-0">
+                          {account.sparklineData.length > 1 && (
+                            <div className="flex-shrink-0 opacity-70">
                               <Sparkline
                                 data={account.sparklineData}
-                                width={60}
+                                width={80}
                                 height={24}
-                                color={initialColor}
+                                color="#4D8FDB"
                               />
                             </div>
                           )}
 
                           {/* Balance */}
-                          <div className="flex-shrink-0 text-right">
-                            <p className="font-display text-money-md text-flourish-text tabular-nums">
+                          <div className="flex-shrink-0 text-right" style={{ minWidth: 120 }}>
+                            <p className="font-display text-sm font-semibold text-flourish-text tabular-nums">
                               {formatCurrency(account.balance)}
                             </p>
-                            <p className="text-xs text-flourish-secondary">
+                            <p className="text-xs text-flourish-muted">
                               {formatLastSynced(account.lastSyncedAt)}
                             </p>
                           </div>
 
-                          {/* Visibility toggle */}
+                          {/* Hide toggle — only shows on hover */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleAccountHidden(account.id);
                             }}
                             title={isHidden ? 'Show in totals' : 'Hide from totals'}
-                            className="flex-shrink-0 p-2 rounded-lg hover:bg-flourish-hover transition-colors"
+                            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-flourish-hover transition-colors opacity-0 group-hover:opacity-100"
                           >
                             {isHidden ? (
-                              <EyeOff size={16} className="text-flourish-secondary" />
+                              <EyeOff size={14} className="text-flourish-secondary" />
                             ) : (
-                              <Eye size={16} className="text-flourish-secondary" />
+                              <Eye size={14} className="text-flourish-secondary" />
                             )}
                           </button>
                         </div>
-
-                        {/* Credit Card Usage Bar */}
-                        {account.creditLimit && creditUsagePercent > 0 && (
-                          <div className="mt-3 space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-flourish-secondary">
-                                Credit Used
-                              </span>
-                              <span className="text-flourish-text font-medium">
-                                {((creditUsagePercent) * 100).toFixed(0)}% of{" "}
-                                {formatCurrency(account.creditLimit)}
-                              </span>
-                            </div>
-                            <ProgressBar
-                              progress={creditUsagePercent}
-                              color={
-                                creditUsagePercent > 0.9
-                                  ? "var(--flourish-red)"
-                                  : "var(--flourish-orange)"
-                              }
-                              height={3}
-                            />
-                          </div>
-                        )}
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Summary Sidebar */}
-        <div className="animate-slide-up stagger-5">
-          <Card>
-            <div className="space-y-6">
-              <SectionHeader title="Assets vs Liabilities" />
-
-              {/* Main Summary Row */}
-              <div className="space-y-4">
-                {/* Assets */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-flourish-green" />
-                    <span className="text-sm text-flourish-secondary">
-                      Assets
-                    </span>
-                    <span className="ml-auto font-display text-money-md text-flourish-text tabular-nums">
-                      {formatCurrency(assets)}
-                    </span>
-                  </div>
-                  <ProgressBar
-                    progress={assetsPercent}
-                    color="var(--flourish-green)"
-                    height={6}
-                  />
-                </div>
-
-                {/* Liabilities */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-flourish-red" />
-                    <span className="text-sm text-flourish-secondary">
-                      Liabilities
-                    </span>
-                    <span className="ml-auto font-display text-money-md text-flourish-text tabular-nums">
-                      {formatCurrency(liabilities)}
-                    </span>
-                  </div>
-                  <ProgressBar
-                    progress={1 - assetsPercent}
-                    color="var(--flourish-red)"
-                    height={6}
-                  />
+        {/* Summary Sidebar — Monarch style */}
+        <div className="animate-slide-up stagger-5 self-start sticky top-6">
+          <Card className="p-5">
+            <div className="space-y-5">
+              {/* Header with Totals/Percent toggle */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold text-flourish-text">Summary</h3>
+                <div className="flex items-center gap-0.5 rounded-lg bg-flourish-bg p-0.5 text-xs">
+                  <button
+                    onClick={() => setSummaryMode('totals')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md font-medium transition-colors",
+                      summaryMode === 'totals' ? 'bg-white text-flourish-text shadow-sm' : 'text-flourish-secondary'
+                    )}
+                  >
+                    Totals
+                  </button>
+                  <button
+                    onClick={() => setSummaryMode('percent')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md font-medium transition-colors",
+                      summaryMode === 'percent' ? 'bg-white text-flourish-text shadow-sm' : 'text-flourish-secondary'
+                    )}
+                  >
+                    Percent
+                  </button>
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-flourish-bg" />
-
-              {/* Net Worth Summary */}
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wider text-flourish-tertiary">
-                  Total Net Worth
-                </p>
-                <p className="font-display text-money-lg text-flourish-text tabular-nums">
-                  {formatCurrency(netWorth)}
-                </p>
-                <p className="text-xs text-flourish-secondary">
-                  Updated just now
-                </p>
+              {/* Assets section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-flourish-text">Assets</span>
+                  <span className="font-display text-base font-semibold text-flourish-text tabular-nums">
+                    {summaryMode === 'percent' ? `${assetsPercent > 0 ? (assetsPercent * 100).toFixed(1) : 0}%` : formatCurrency(assets)}
+                  </span>
+                </div>
+                {/* Stacked progress bar showing composition */}
+                <StackedBar
+                  segments={accountGroups
+                    .filter((g) => g.type !== 'creditCards' && g.type !== 'loans')
+                    .map((g) => ({
+                      label: g.label,
+                      value: g.accounts.filter((a) => !hiddenAccountIds.has(a.id)).reduce((s, a) => s + a.balance, 0),
+                      color: g.type === 'investments' ? '#2B8A3E' : g.type === 'cash' ? '#4D8FDB' : '#7C3AED',
+                    }))
+                    .filter((s) => s.value > 0)}
+                />
+                <div className="space-y-1.5 pt-1">
+                  {accountGroups
+                    .filter((g) => g.type !== 'creditCards' && g.type !== 'loans')
+                    .map((g) => {
+                      const total = g.accounts.filter((a) => !hiddenAccountIds.has(a.id)).reduce((s, a) => s + a.balance, 0);
+                      if (total === 0) return null;
+                      const color = g.type === 'investments' ? '#2B8A3E' : g.type === 'cash' ? '#4D8FDB' : '#7C3AED';
+                      return (
+                        <div key={g.id} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="text-flourish-secondary">{g.label}</span>
+                          </div>
+                          <span className="tabular-nums text-flourish-text font-medium">
+                            {summaryMode === 'percent' && assets > 0 ? `${((total / assets) * 100).toFixed(1)}%` : formatCurrency(total)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
 
-              {/* Asset Breakdown */}
-              <div className="space-y-2 text-sm">
-                <p className="text-xs font-medium uppercase tracking-wider text-flourish-tertiary">
-                  Breakdown
-                </p>
-                {accountGroups.map((group) => {
-                  const groupTotal = group.accounts.reduce(
-                    (sum, a) => sum + a.balance,
-                    0
-                  );
-                  const isLiability =
-                    group.type === "creditCards" || group.type === "loans";
-                  const displayValue = isLiability ? -groupTotal : groupTotal;
-                  const percent =
-                    Math.abs(displayValue) /
-                    (assets + liabilities);
+              {/* Liabilities section */}
+              {liabilities > 0 && (
+                <div className="space-y-3 pt-3 border-t border-flourish-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-flourish-text">Liabilities</span>
+                    <span className="font-display text-base font-semibold text-flourish-red tabular-nums">
+                      {summaryMode === 'percent' && (assets + liabilities) > 0 ? `${((liabilities / (assets + liabilities)) * 100).toFixed(1)}%` : formatCurrency(liabilities)}
+                    </span>
+                  </div>
+                  <StackedBar
+                    segments={accountGroups
+                      .filter((g) => g.type === 'creditCards' || g.type === 'loans')
+                      .map((g) => ({
+                        label: g.label,
+                        value: g.accounts.filter((a) => !hiddenAccountIds.has(a.id)).reduce((s, a) => s + a.balance, 0),
+                        color: g.type === 'creditCards' ? '#E5633A' : '#E03131',
+                      }))
+                      .filter((s) => s.value > 0)}
+                  />
+                  <div className="space-y-1.5 pt-1">
+                    {accountGroups
+                      .filter((g) => g.type === 'creditCards' || g.type === 'loans')
+                      .map((g) => {
+                        const total = g.accounts.filter((a) => !hiddenAccountIds.has(a.id)).reduce((s, a) => s + a.balance, 0);
+                        if (total === 0) return null;
+                        const color = g.type === 'creditCards' ? '#E5633A' : '#E03131';
+                        return (
+                          <div key={g.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                              <span className="text-flourish-secondary">{g.label}</span>
+                            </div>
+                            <span className="tabular-nums text-flourish-text font-medium">
+                              {summaryMode === 'percent' && liabilities > 0 ? `${((total / liabilities) * 100).toFixed(1)}%` : formatCurrency(total)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <div
-                      key={group.id}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-flourish-secondary">
-                        {group.label}
-                      </span>
-                      <span className="font-medium text-flourish-text tabular-nums">
-                        {formatCurrency(displayValue)} ({(percent * 100).toFixed(0)}%)
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              {/* Download CSV */}
+              <button
+                onClick={handleDownloadCSV}
+                className="w-full text-center text-xs font-medium text-flourish-orange hover:underline pt-2 border-t border-flourish-border"
+              >
+                Download CSV
+              </button>
             </div>
           </Card>
         </div>
