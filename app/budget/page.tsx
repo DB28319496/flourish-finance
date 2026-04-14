@@ -7,6 +7,8 @@ import {
   ChevronDown,
   Settings,
   Eye,
+  Plus,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/mock-data";
@@ -26,7 +28,8 @@ export default function BudgetPage() {
   const [showUnbudgeted, setShowUnbudgeted] = useState<Set<string>>(new Set());
   const [rightTab, setRightTab] = useState<"summary" | "income" | "expenses">("summary");
 
-  const { budgetSections, updateBudgetTarget } = useData();
+  const { budgetSections, updateBudgetTarget, addBudgetCategory, deleteBudgetCategory } = useData();
+  const [addModal, setAddModal] = useState<null | { section: "income" | "fixed" | "flexible" | "nonMonthly" }>(null);
 
   // Header month label
   const monthLabel = month.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -131,6 +134,8 @@ export default function BudgetPage() {
             showUnbudgeted={showUnbudgeted}
             toggleUnbudgeted={toggleUnbudgeted}
             updateBudgetTarget={updateBudgetTarget}
+            deleteBudgetCategory={deleteBudgetCategory}
+            onAddCategory={(section: string) => setAddModal({ section: section as any })}
           />
 
           {/* Expenses section */}
@@ -144,6 +149,8 @@ export default function BudgetPage() {
             showUnbudgeted={showUnbudgeted}
             toggleUnbudgeted={toggleUnbudgeted}
             updateBudgetTarget={updateBudgetTarget}
+            deleteBudgetCategory={deleteBudgetCategory}
+            onAddCategory={(section: string) => setAddModal({ section: section as any })}
           />
         </div>
 
@@ -213,6 +220,17 @@ export default function BudgetPage() {
           </div>
         </aside>
       </div>
+
+      {/* Add category modal */}
+      {addModal && (
+        <AddCategoryModal
+          section={addModal.section}
+          onSave={async (meta, amount) => {
+            await addBudgetCategory(meta, amount);
+          }}
+          onClose={() => setAddModal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -231,7 +249,16 @@ function BudgetTable({
   showUnbudgeted,
   toggleUnbudgeted,
   updateBudgetTarget,
+  deleteBudgetCategory,
+  onAddCategory,
 }: any) {
+  // Map UI section id → storage section key
+  const sectionKeyMap: Record<string, string> = {
+    income: "income",
+    fixed: "fixed",
+    flex: "flexible",
+    nonmo: "nonMonthly",
+  };
   return (
     <div className="bg-white">
       {/* Top-level heading row */}
@@ -275,21 +302,40 @@ function BudgetTable({
             {/* Category rows */}
             {!isCollapsed && (
               <>
+                {rows.length === 0 && (
+                  <div className="px-6 py-4 text-xs text-flourish-muted italic border-b border-flourish-border">
+                    No categories yet. Click &ldquo;Add category&rdquo; below to get started.
+                  </div>
+                )}
                 {rows.map((cat: any) => (
-                  <CategoryRow key={cat.id} category={cat} updateBudgetTarget={updateBudgetTarget} />
+                  <CategoryRow
+                    key={cat.id}
+                    category={cat}
+                    updateBudgetTarget={updateBudgetTarget}
+                    onDelete={() => deleteBudgetCategory(cat.id)}
+                  />
                 ))}
 
-                {unbudgeted.length > 0 && (
+                <div className="flex items-center gap-3 px-6 py-2 border-b border-flourish-border">
                   <button
-                    onClick={() => toggleUnbudgeted(section.id)}
-                    className="w-full flex items-center gap-2 px-6 py-2.5 text-xs font-medium text-flourish-secondary hover:text-flourish-dark hover:bg-flourish-hover/30 transition-colors border-b border-flourish-border"
+                    onClick={() => onAddCategory(sectionKeyMap[section.id] || section.type)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-flourish-orange hover:bg-orange-50 rounded-md transition-colors"
                   >
-                    <Eye size={14} />
-                    {showUnbudgeted.has(section.id)
-                      ? `Hide ${unbudgeted.length} unbudgeted`
-                      : `Show ${unbudgeted.length} unbudgeted`}
+                    <Plus size={12} /> Add category
                   </button>
-                )}
+
+                  {unbudgeted.length > 0 && (
+                    <button
+                      onClick={() => toggleUnbudgeted(section.id)}
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-flourish-secondary hover:text-flourish-dark hover:bg-flourish-hover rounded-md transition-colors"
+                    >
+                      <Eye size={12} />
+                      {showUnbudgeted.has(section.id)
+                        ? `Hide ${unbudgeted.length} unbudgeted`
+                        : `Show ${unbudgeted.length} unbudgeted`}
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -314,9 +360,11 @@ function BudgetTable({
 function CategoryRow({
   category,
   updateBudgetTarget,
+  onDelete,
 }: {
   category: any;
   updateBudgetTarget: (id: string, amount: number) => Promise<void>;
+  onDelete?: () => void;
 }) {
   const [editValue, setEditValue] = useState(category.budgetAmount.toString());
   const [focused, setFocused] = useState(false);
@@ -349,12 +397,23 @@ function CategoryRow({
   const barWidth = category.budgetAmount === 0 ? 0 : Math.min(progress, 1) * 100;
 
   return (
-    <div className="border-b border-flourish-border">
+    <div className="border-b border-flourish-border group">
       <div className="grid grid-cols-[1fr_140px_140px_140px] items-center gap-3 px-6 py-2.5 hover:bg-flourish-hover/20 transition-colors">
         {/* Category */}
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base">{category.emoji}</span>
           <span className="text-sm text-flourish-text truncate">{category.name}</span>
+          {onDelete && (
+            <button
+              onClick={() => {
+                if (confirm(`Delete budget for "${category.name}"?`)) onDelete();
+              }}
+              className="ml-auto p-1 rounded text-flourish-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Delete budget"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         {/* Budget (editable) */}
@@ -462,6 +521,158 @@ function SidebarSection({
         <span className={cn("tabular-nums font-medium", remaining >= 0 ? "text-emerald-700" : "text-red-700")}>
           {formatCurrency(Math.abs(remaining))} {remaining >= 0 ? "remaining" : "over"}
         </span>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Add Category Modal
+// =============================================================================
+
+const EMOJI_OPTIONS = [
+  "💵", "💰", "💳", "🏠", "🚗", "🍽", "🛒", "☕️", "🎬", "💪",
+  "✈️", "🏥", "📚", "🎮", "🐾", "🛍", "⚡️", "🌐", "📱", "💊",
+  "🎓", "🏋️", "🧘", "💄", "🏖", "🚇", "⛽", "📦", "🎨", "🎁",
+];
+
+function AddCategoryModal({
+  section,
+  onSave,
+  onClose,
+}: {
+  section: "income" | "fixed" | "flexible" | "nonMonthly";
+  onSave: (meta: { name: string; emoji: string; section: typeof section }, amount: number) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState(section === "income" ? "💵" : "💰");
+  const [amount, setAmount] = useState("");
+  const [sec, setSec] = useState<typeof section>(section);
+  const [saving, setSaving] = useState(false);
+
+  const SECTION_LABELS: Record<string, string> = {
+    income: "Income",
+    fixed: "Fixed",
+    flexible: "Flexible",
+    nonMonthly: "Non-Monthly",
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    await onSave(
+      { name: name.trim(), emoji, section: sec },
+      parseFloat(amount) || 0
+    );
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-flourish-border">
+          <h2 className="font-display text-xl font-bold text-flourish-dark">New budget category</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-flourish-hover">
+            <X size={18} className="text-flourish-secondary" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-1.5">Category name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              required
+              placeholder="e.g., Travel, Pet Supplies, Paycheck"
+              className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+            />
+          </div>
+
+          {/* Section */}
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-1.5">Section</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["income", "fixed", "flexible", "nonMonthly"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSec(s)}
+                  className={cn(
+                    "px-2 py-2 rounded-lg text-xs font-medium transition-colors",
+                    sec === s
+                      ? "bg-flourish-orange text-white"
+                      : "bg-flourish-bg text-flourish-secondary hover:bg-flourish-hover"
+                  )}
+                >
+                  {SECTION_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-1.5">
+              Monthly budget {sec === "income" ? "(expected income)" : "(spending limit)"}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-flourish-muted">$</span>
+              <input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full pl-7 pr-3 py-2.5 border border-flourish-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+              />
+            </div>
+          </div>
+
+          {/* Emoji picker */}
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-2">Icon</label>
+            <div className="grid grid-cols-10 gap-1.5">
+              {EMOJI_OPTIONS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={cn(
+                    "p-2 rounded-lg text-lg transition-all",
+                    emoji === e ? "bg-flourish-orange/10 ring-2 ring-flourish-orange" : "hover:bg-flourish-hover"
+                  )}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 text-sm font-medium text-flourish-dark border border-flourish-border rounded-xl hover:bg-flourish-hover"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || saving}
+              className="flex-1 py-2.5 text-sm font-semibold text-white bg-flourish-orange rounded-xl hover:bg-orange-600 disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "Add category"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

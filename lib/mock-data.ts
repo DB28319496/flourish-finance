@@ -186,6 +186,14 @@ export interface BudgetTargetConfig {
   rolledOverBalance?: number; // computed balance carried from previous months
 }
 
+// Metadata for user-created budget categories
+export interface BudgetCategoryMeta {
+  id: string; // = category slug
+  name: string;
+  emoji: string;
+  section: "income" | "fixed" | "flexible" | "nonMonthly";
+}
+
 // ---------------------------------------------------------------------------
 // DATA
 // ---------------------------------------------------------------------------

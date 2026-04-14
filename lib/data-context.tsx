@@ -30,6 +30,7 @@ import {
   type CategorizationRule,
   type TransactionSplit,
   type ManualAccount,
+  type BudgetCategoryMeta,
 } from "./mock-data";
 import * as firestore from "./firestore-helpers";
 import {
@@ -153,6 +154,11 @@ interface DataContextType {
   addManualAccount: (account: Omit<ManualAccount, "id" | "createdAt" | "lastUpdated">) => Promise<void>;
   updateManualAccount: (id: string, updates: Partial<ManualAccount>) => Promise<void>;
   deleteManualAccount: (id: string) => Promise<void>;
+
+  // Budget category metadata
+  budgetCategoryMeta: Record<string, BudgetCategoryMeta>;
+  addBudgetCategory: (meta: Omit<BudgetCategoryMeta, "id">, amount: number) => Promise<void>;
+  deleteBudgetCategory: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -356,14 +362,16 @@ function plaidTransactionsToGroups(
 function buildBudgetSections(
   transactions: PlaidTransaction[],
   budgetTargets: Record<string, number>,
+  budgetCategoryMeta: Record<string, BudgetCategoryMeta>,
   transferIds?: Set<string>
 ): BudgetSection[] {
   const actualSpending = computeActualSpending(transactions, undefined, transferIds);
 
-  // Build category list from actual spending + saved targets
-  const allCategories = Array.from(new Set([
-    ...Object.keys(actualSpending),
+  // All categories come from any of: saved budgets, user-created metadata, actual spending
+  const allCategoryIds = Array.from(new Set([
     ...Object.keys(budgetTargets),
+    ...Object.keys(budgetCategoryMeta),
+    ...Object.keys(actualSpending),
   ]));
 
   const EMOJI_MAP: Record<string, string> = {
@@ -378,43 +386,60 @@ function buildBudgetSections(
     "paychecks": "💵", "other-income": "💰",
   };
 
-  const categories: BudgetCategory[] = [];
-  for (const cat of allCategories) {
-    const displayName = cat
+  // Always show these default empty sections so users have somewhere to add categories
+  const sectionsMap: Record<string, BudgetCategory[]> = {
+    income: [],
+    fixed: [],
+    flexible: [],
+    nonMonthly: [],
+  };
+
+  for (const id of allCategoryIds) {
+    const meta = budgetCategoryMeta[id];
+
+    // Prefer user metadata; fall back to heuristics
+    const displayName = meta?.name || id
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
 
-    categories.push({
-      id: cat,
+    const emoji = meta?.emoji || EMOJI_MAP[id] || "💰";
+    const budgetAmount = budgetTargets[id] || 0;
+    const actualAmount = Math.round((actualSpending[id] || 0) * 100) / 100;
+
+    // Determine section: use metadata, else heuristics
+    let section: "income" | "fixed" | "flexible" | "nonMonthly";
+    if (meta?.section) {
+      section = meta.section;
+    } else if (displayName.toLowerCase().includes("paycheck") || displayName.toLowerCase().includes("income") || id.includes("income")) {
+      section = "income";
+    } else if (budgetAmount > 0) {
+      section = "fixed";
+    } else {
+      section = "flexible";
+    }
+
+    sectionsMap[section].push({
+      id,
       name: displayName,
-      emoji: EMOJI_MAP[cat] || "💰",
+      emoji,
       group: "Spending",
-      budgetAmount: budgetTargets[cat] || 0,
-      actualAmount: Math.round((actualSpending[cat] || 0) * 100) / 100,
+      budgetAmount,
+      actualAmount,
     });
   }
 
-  // Sort by actual amount descending
-  categories.sort((a, b) => b.actualAmount - a.actualAmount);
-
-  // Split into sections
-  const incomeCategories = categories.filter((c) => c.name.toLowerCase().includes("paycheck") || c.name.toLowerCase().includes("income"));
-  const fixedCategories = categories.filter((c) => c.budgetAmount > 0 && !incomeCategories.includes(c));
-  const flexibleCategories = categories.filter((c) => c.budgetAmount === 0 && c.actualAmount > 0 && !incomeCategories.includes(c));
-
-  const sections: BudgetSection[] = [];
-  if (incomeCategories.length > 0) {
-    sections.push({ id: "income", name: "Income", type: "income", categories: incomeCategories });
-  }
-  if (fixedCategories.length > 0) {
-    sections.push({ id: "fixed", name: "Fixed & Budgeted", type: "fixed", categories: fixedCategories });
-  }
-  if (flexibleCategories.length > 0) {
-    sections.push({ id: "flex", name: "Flexible", type: "flexible", categories: flexibleCategories });
+  // Sort each section by actual amount descending
+  for (const k of Object.keys(sectionsMap)) {
+    sectionsMap[k].sort((a, b) => b.actualAmount - a.actualAmount);
   }
 
-  return sections;
+  return [
+    { id: "income", name: "Income", type: "income", categories: sectionsMap.income },
+    { id: "fixed", name: "Fixed", type: "fixed", categories: sectionsMap.fixed },
+    { id: "flex", name: "Flexible", type: "flexible", categories: sectionsMap.flexible },
+    { id: "nonmo", name: "Non-Monthly", type: "nonMonthly", categories: sectionsMap.nonMonthly },
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +484,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [rules, setRules] = useState<CategorizationRule[]>([]);
   const [splits, setSplits] = useState<Record<string, TransactionSplit>>({});
   const [manualAccounts, setManualAccounts] = useState<ManualAccount[]>([]);
+  const [budgetCategoryMeta, setBudgetCategoryMeta] = useState<Record<string, BudgetCategoryMeta>>({});
 
   // Mock data is ONLY shown to unauthenticated users (never leaks between real users).
   // When authenticated but no Plaid data yet, pages show their own empty states.
@@ -648,8 +674,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // -- Budget
   const budgetSections = useMemo(
-    () => (isUsingMockData ? mockBudgetSections : buildBudgetSections(rawTransactions, budgetTargets, transferIds)),
-    [isUsingMockData, rawTransactions, budgetTargets, transferIds]
+    () => (isUsingMockData ? mockBudgetSections : buildBudgetSections(rawTransactions, budgetTargets, budgetCategoryMeta, transferIds)),
+    [isUsingMockData, rawTransactions, budgetTargets, budgetCategoryMeta, transferIds]
   );
 
   // -- Advice / Insights
@@ -902,6 +928,58 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (user) await firestore.deleteDoc(user.uid, ["manual_accounts", id]);
   }, [user]);
 
+  // Budget category metadata CRUD
+  const addBudgetCategory = useCallback(async (
+    meta: Omit<BudgetCategoryMeta, "id">,
+    amount: number
+  ) => {
+    // Create a slug from the name
+    const slug = meta.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 60);
+
+    // Avoid collisions — if slug already exists, append a number
+    let id = slug || `custom-${Date.now()}`;
+    if (budgetCategoryMeta[id] || budgetTargets[id]) {
+      id = `${slug}-${Date.now()}`;
+    }
+
+    const fullMeta: BudgetCategoryMeta = { ...meta, id };
+    setBudgetCategoryMeta((prev) => ({ ...prev, [id]: fullMeta }));
+
+    // Also set the budget target amount
+    if (amount > 0) {
+      const newTargets = { ...budgetTargets, [id]: amount };
+      setBudgetTargets(newTargets);
+      if (user) await firestore.setDoc(user.uid, ["settings", "budget_targets"], newTargets as any);
+    }
+
+    if (user) {
+      const allMeta = { ...budgetCategoryMeta, [id]: fullMeta };
+      await firestore.setDoc(user.uid, ["settings", "budget_categories"], allMeta as any);
+    }
+  }, [budgetCategoryMeta, budgetTargets, user]);
+
+  const deleteBudgetCategory = useCallback(async (id: string) => {
+    // Remove metadata
+    const newMeta = { ...budgetCategoryMeta };
+    delete newMeta[id];
+    setBudgetCategoryMeta(newMeta);
+
+    // Remove budget target
+    const newTargets = { ...budgetTargets };
+    delete newTargets[id];
+    setBudgetTargets(newTargets);
+
+    if (user) {
+      await firestore.setDoc(user.uid, ["settings", "budget_categories"], newMeta as any);
+      await firestore.setDoc(user.uid, ["settings", "budget_targets"], newTargets as any);
+    }
+  }, [budgetCategoryMeta, budgetTargets, user]);
+
   const sendChatMessage = useCallback(async (
     message: string,
     history: { role: string; content: string }[] = []
@@ -1041,8 +1119,9 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
 
     // Load all user data from Firestore in parallel
     (async () => {
-      const [budgets, settings, userGoals, edits, snapshots, userRules, userSplits, userManual] = await Promise.all([
+      const [budgets, budgetCats, settings, userGoals, edits, snapshots, userRules, userSplits, userManual] = await Promise.all([
         firestore.getDoc<Record<string, number>>(user.uid, ["settings", "budget_targets"]),
+        firestore.getDoc<Record<string, BudgetCategoryMeta>>(user.uid, ["settings", "budget_categories"]),
         firestore.getDoc<UserSettings>(user.uid, ["settings", "user"]),
         firestore.listCollection<Goal>(user.uid, "goals"),
         firestore.listCollection<TransactionEdit & { id: string }>(user.uid, "transaction_edits"),
@@ -1053,6 +1132,7 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
       ]);
 
       if (budgets) setBudgetTargets(budgets);
+      if (budgetCats) setBudgetCategoryMeta(budgetCats);
       if (settings) setUserSettings(settings);
       setGoals(userGoals);
       setTransactionEdits(
@@ -1126,6 +1206,8 @@ ${rawTransactions.slice(0, 30).map((t) => `- ${t.date}: [${t.transaction_id}] ${
         splits, updateSplit, deleteSplit,
         // Phase 4
         manualAccounts, addManualAccount, updateManualAccount, deleteManualAccount,
+        // Budget categories
+        budgetCategoryMeta, addBudgetCategory, deleteBudgetCategory,
       }}
     >
       {children}

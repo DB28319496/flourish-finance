@@ -25,6 +25,7 @@ const TOOL_LABELS: Record<string, (input: any, result: any) => string> = {
   delete_goal: () => `Deleted goal`,
   list_goals: (_, result) => `Listed ${result?.result?.goals?.length ?? 0} goals`,
   set_budget_target: (input) => `Set ${input.category} budget to $${input.amount}`,
+  create_budget_category: (input) => `Created ${input.section} budget: ${input.emoji || '💰'} ${input.name} ($${input.amount}/mo)`,
   exclude_from_recurring: (input) => `Hid ${input.merchant} from recurring`,
   update_transaction: (input) => `Updated transaction`,
   update_setting: (input) => `Updated setting: ${input.key}`,

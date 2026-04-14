@@ -61,7 +61,7 @@ const tools = [
   },
   {
     name: "set_budget_target",
-    description: "Set a monthly budget target for a category (e.g., 'Food and Drink', 'Shopping', 'Transportation').",
+    description: "Set a monthly budget target for an EXISTING category (auto-detected from transactions).",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -69,6 +69,20 @@ const tools = [
         amount: { type: "number", description: "Monthly budget amount in dollars" },
       },
       required: ["category", "amount"],
+    },
+  },
+  {
+    name: "create_budget_category",
+    description: "Create a NEW budget category with a name, emoji, section (income/fixed/flexible/nonMonthly), and amount. Use this when the user wants a budget for something not already in their data (e.g., 'add a $200 travel budget').",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Display name, e.g., 'Travel' or 'Pet Supplies'" },
+        emoji: { type: "string", description: "Single emoji icon, e.g., '✈️'" },
+        section: { type: "string", enum: ["income", "fixed", "flexible", "nonMonthly"], description: "Which section of the budget this belongs in" },
+        amount: { type: "number", description: "Monthly budget amount in dollars" },
+      },
+      required: ["name", "section", "amount"],
     },
   },
   {
@@ -214,6 +228,38 @@ async function executeTool(name: string, input: any, uid: string): Promise<{ suc
           { merge: true }
         );
         return { success: true, result: { category: categoryKey, amount: input.amount } };
+      }
+
+      case "create_budget_category": {
+        const slug = String(input.name)
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .replace(/\s+/g, "-")
+          .slice(0, 60) || `custom-${Date.now()}`;
+
+        const meta = {
+          id: slug,
+          name: input.name,
+          emoji: input.emoji || "💰",
+          section: input.section,
+        };
+
+        // Update category metadata
+        const metaDoc = await userRef.collection("settings").doc("budget_categories").get();
+        const existing = (metaDoc.data() || {}) as Record<string, any>;
+        existing[slug] = meta;
+        await userRef.collection("settings").doc("budget_categories").set(existing);
+
+        // Update budget amount
+        if (input.amount > 0) {
+          await userRef.collection("settings").doc("budget_targets").set(
+            { [slug]: input.amount },
+            { merge: true }
+          );
+        }
+
+        return { success: true, result: { id: slug, meta, amount: input.amount } };
       }
 
       case "exclude_from_recurring": {
