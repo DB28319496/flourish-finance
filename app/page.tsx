@@ -6,8 +6,9 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Sparkles, CreditCard, Wallet, Target, Calendar,
+  Loader2,
 } from 'lucide-react';
-import { Card, Badge, Skeleton, SkeletonCard } from '@/components/ui';
+import { Card, Badge } from '@/components/ui';
 import { WeeklyBriefCard } from '@/components/weekly-brief-card';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
@@ -34,18 +35,18 @@ export default function DashboardPage() {
 
   if (isLoading && !isUsingMockData) {
     return (
-      <div className="space-y-8">
-        <div>
-          <Skeleton className="h-10 w-64 mb-2" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
-        </div>
-        <SkeletonCard className="h-72" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SkeletonCard className="lg:col-span-2 h-80" />
-          <SkeletonCard className="h-80" />
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-flourish-orange">
+            <svg width="48" height="48" viewBox="0 0 36 36" fill="none" className="animate-pulse">
+              <path d="M18 4C18 4 22 8 26 8C30 8 32 12 30 16C28 20 24 20 22 18C20 16 18 12 18 12C18 12 16 16 14 18C12 20 8 20 6 16C4 12 6 8 10 8C14 8 18 4 18 4Z" fill="currentColor" />
+              <path d="M18 12C18 12 20 16 22 18C24 20 24 24 22 28C20 32 16 32 14 28C12 24 12 20 14 18C16 16 18 12 18 12Z" fill="currentColor" opacity="0.7" />
+            </svg>
+          </div>
+          <div className="flex items-center gap-2 text-flourish-secondary">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="font-body text-sm">Loading your finances…</span>
+          </div>
         </div>
       </div>
     );
