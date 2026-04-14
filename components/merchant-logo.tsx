@@ -31,7 +31,7 @@ const MERCHANT_DOMAINS: Record<string, string> = {
   'dunkin': 'dunkindonuts.com',
   'chipotle': 'chipotle.com',
   'mcdonalds': 'mcdonalds.com',
-  'mcdonald\'s': 'mcdonalds.com',
+  "mcdonald's": 'mcdonalds.com',
   'chick-fil-a': 'chick-fil-a.com',
   'chick fil a': 'chick-fil-a.com',
   'panera': 'panerabread.com',
@@ -75,10 +75,10 @@ const MERCHANT_DOMAINS: Record<string, string> = {
   // Retail
   'best buy': 'bestbuy.com',
   'home depot': 'homedepot.com',
-  'lowe\'s': 'lowes.com',
+  "lowe's": 'lowes.com',
   'lowes': 'lowes.com',
   'macys': 'macys.com',
-  'macy\'s': 'macys.com',
+  "macy's": 'macys.com',
   'nordstrom': 'nordstrom.com',
   'nike': 'nike.com',
   'adidas': 'adidas.com',
@@ -88,12 +88,14 @@ const MERCHANT_DOMAINS: Record<string, string> = {
   'lululemon': 'lululemon.com',
   'zara': 'zara.com',
 
-  // Banks
+  // Banks & Investment institutions
   'chase': 'chase.com',
   'bank of america': 'bankofamerica.com',
   'wells fargo': 'wellsfargo.com',
   'citi': 'citi.com',
+  'citibank': 'citi.com',
   'capital one': 'capitalone.com',
+  'capitalone': 'capitalone.com',
   'american express': 'americanexpress.com',
   'amex': 'americanexpress.com',
   'discover': 'discover.com',
@@ -102,16 +104,28 @@ const MERCHANT_DOMAINS: Record<string, string> = {
   'schwab': 'schwab.com',
   'charles schwab': 'schwab.com',
   'fidelity': 'fidelity.com',
+  'fidelity investments': 'fidelity.com',
   'vanguard': 'vanguard.com',
   'etrade': 'etrade.com',
   'e*trade': 'etrade.com',
   'e-trade': 'etrade.com',
+  'e*trade financial': 'etrade.com',
+  'morgan stanley': 'morganstanley.com',
+  'goldman sachs': 'goldmansachs.com',
+  'marcus': 'marcus.com',
+  'sofi': 'sofi.com',
+  'chime': 'chime.com',
   'robinhood': 'robinhood.com',
   'coinbase': 'coinbase.com',
   'paypal': 'paypal.com',
   'venmo': 'venmo.com',
   'cash app': 'cash.app',
   'zelle': 'zellepay.com',
+  'usaa': 'usaa.com',
+  'navy federal': 'navyfederal.org',
+  'pnc': 'pnc.com',
+  'us bank': 'usbank.com',
+  'td bank': 'td.com',
 
   // Utilities / bills
   'verizon': 'verizon.com',
@@ -124,7 +138,7 @@ const MERCHANT_DOMAINS: Record<string, string> = {
   'cox': 'cox.com',
   'cox communications': 'cox.com',
 
-  // Other
+  // Fitness & other
   'tesla': 'tesla.com',
   'airbnb': 'airbnb.com',
   'planet fitness': 'planetfitness.com',
@@ -140,26 +154,44 @@ const MERCHANT_DOMAINS: Record<string, string> = {
 
 /**
  * Guess a domain from a merchant name.
- * Returns null if we don't have a reasonable guess.
  */
 function guessDomain(name: string): string | null {
+  if (!name) return null;
   const key = name.toLowerCase().trim();
   if (MERCHANT_DOMAINS[key]) return MERCHANT_DOMAINS[key];
 
-  // Try key without punctuation
-  const stripped = key.replace(/[.,!'*]/g, "").trim();
+  // Try without punctuation
+  const stripped = key.replace(/[.,!'*]/g, '').trim();
   if (MERCHANT_DOMAINS[stripped]) return MERCHANT_DOMAINS[stripped];
+
+  // Partial match: any key that's a substring of the merchant name
+  for (const [k, v] of Object.entries(MERCHANT_DOMAINS)) {
+    if (key.includes(k) || stripped.includes(k)) return v;
+  }
 
   // Try first word if multi-word
   const firstWord = stripped.split(/\s+/)[0];
   if (firstWord.length > 2 && MERCHANT_DOMAINS[firstWord]) return MERCHANT_DOMAINS[firstWord];
 
-  // Heuristic: if name is one word and looks brand-like, guess {word}.com
-  if (/^[a-z0-9]+$/.test(firstWord) && firstWord.length >= 4) {
+  // Heuristic: if name is simple one-word, try {word}.com
+  if (/^[a-z0-9]+$/.test(firstWord) && firstWord.length >= 3) {
     return `${firstWord}.com`;
   }
 
   return null;
+}
+
+/**
+ * Returns an ordered list of logo URLs to try.
+ * Uses multiple providers so if one is slow/down, we have backups.
+ */
+function logoUrls(domain: string): string[] {
+  return [
+    // Google's favicon API — extremely reliable, free, no auth
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    // DuckDuckGo's icon service — decent quality fallback
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ];
 }
 
 export function MerchantLogo({
@@ -171,14 +203,17 @@ export function MerchantLogo({
   size?: number;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
-  const domain = !failed ? guessDomain(name) : null;
+  const domain = guessDomain(name);
+  const urls = domain ? logoUrls(domain) : [];
+  const [urlIndex, setUrlIndex] = useState(0);
+
   const initial = (name || '?').charAt(0).toUpperCase();
   const bg = getMerchantColor(name);
-
   const dimensions = { width: size, height: size };
 
-  if (domain && !failed) {
+  const hasUrl = urls.length > 0 && urlIndex < urls.length;
+
+  if (hasUrl) {
     return (
       <div
         className={`rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center bg-white border border-flourish-border ${className}`}
@@ -186,19 +221,20 @@ export function MerchantLogo({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`https://logo.clearbit.com/${domain}`}
+          src={urls[urlIndex]}
           alt={name}
           width={size}
           height={size}
           loading="lazy"
-          onError={() => setFailed(true)}
-          className="w-full h-full object-contain"
+          referrerPolicy="no-referrer"
+          onError={() => setUrlIndex((i) => i + 1)}
+          className="w-full h-full object-contain p-1"
         />
       </div>
     );
   }
 
-  // Fallback: colored circle with initial
+  // Final fallback: colored circle with initial
   return (
     <div
       className={`rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold ${className}`}
