@@ -25,9 +25,10 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ['"Fraunces"', "Georgia", "serif"],
-        body: ['"DM Sans"', "system-ui", "sans-serif"],
-        mono: ['"JetBrains Mono"', "monospace"],
+        display: ['"Instrument Serif"', 'Georgia', 'serif'],
+        body: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"Geist Mono"', '"JetBrains Mono"', 'monospace'],
       },
       fontSize: {
         "money-xl": ["2rem", { lineHeight: "1", fontWeight: "700", letterSpacing: "-0.02em" }],
