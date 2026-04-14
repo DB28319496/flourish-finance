@@ -23,6 +23,7 @@ import {
   SectionHeader,
   Sparkline,
   ProgressBar,
+  EmptyState,
 } from "@/components/ui";
 import { AccountDetailDrawer } from "@/components/account-detail-drawer";
 import { ManualAccountModal } from "@/components/manual-account-modal";
@@ -285,6 +286,22 @@ export default function AccountsPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Accounts Column — Monarch-style grouped list */}
         <div className="space-y-3">
+          {!isUsingMockData && accountGroups.length === 0 && (
+            <Card className="p-0">
+              <div className="flex flex-col items-center gap-4 py-12 px-6 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-flourish-hover flex items-center justify-center text-flourish-tertiary">
+                  <Banknote className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-display text-lg font-semibold text-flourish-text">No accounts connected</p>
+                  <p className="text-sm text-flourish-secondary max-w-sm mx-auto">
+                    Link your bank, credit cards, investments, and loans through Plaid to get a complete picture of your finances.
+                  </p>
+                </div>
+                <PlaidLinkButton />
+              </div>
+            </Card>
+          )}
           {accountGroups.map((group) => {
             const groupTotal = group.accounts.reduce((s, a) => s + a.balance, 0);
             const visibleTotal = group.accounts

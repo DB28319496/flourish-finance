@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Target, Plus, TrendingUp, Calendar, DollarSign, Trash2, Edit2, X } from 'lucide-react';
-import { Card, Badge } from '@/components/ui';
-import { formatCurrency, type Goal } from '@/lib/mock-data';
+import { Target, Plus, TrendingUp, Calendar, DollarSign, Trash2, Edit2, X, History } from 'lucide-react';
+import { Card, Badge, EmptyState } from '@/components/ui';
+import { useToast } from '@/components/toast';
+import { formatCurrency, type Goal, type GoalContribution } from '@/lib/mock-data';
 import { useData } from '@/lib/data-context';
+import { useModal } from '@/lib/use-modal';
 import { cn } from '@/lib/utils';
 
 // Convert a free-form deadline like "Dec 2026" to ISO date string for <input type="date">
@@ -39,11 +41,32 @@ export default function GoalsPage() {
   const { goals, addGoal, updateGoal, deleteGoal, isUsingMockData } = useData();
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [contributionGoal, setContributionGoal] = useState<Goal | null>(null);
+  const [historyGoal, setHistoryGoal] = useState<Goal | null>(null);
+  const toast = useToast();
 
-  // Use mock data if no saved goals yet
+  const handleLogContribution = async (goal: Goal, amount: number, note: string) => {
+    const entry: GoalContribution = {
+      date: new Date().toISOString().slice(0, 10),
+      amount,
+      note: note || undefined,
+    };
+    const contributions = [...(goal.contributions || []), entry];
+    await updateGoal(goal.id, {
+      contributions,
+      current: Math.max(0, (goal.current || 0) + amount),
+    });
+    setContributionGoal(null);
+    toast.success(amount >= 0 ? 'Contribution logged' : 'Withdrawal logged');
+  };
+
+  // Real users with zero goals see an empty state; unauthenticated users see mock data
+  const hasNoGoals = !isUsingMockData && goals.length === 0;
   const displayGoals: (Goal | Omit<Goal, 'id' | 'createdAt'>)[] = goals.length > 0
     ? goals
-    : DEFAULT_GOALS.map((g, i) => ({ ...g, id: `mock-${i}`, createdAt: 0 }));
+    : isUsingMockData
+    ? DEFAULT_GOALS.map((g, i) => ({ ...g, id: `mock-${i}`, createdAt: 0 }))
+    : [];
 
   const totalSaved = displayGoals.reduce((sum, g) => sum + g.current, 0);
   const totalTarget = displayGoals.reduce((sum, g) => sum + g.target, 0);
@@ -119,6 +142,16 @@ export default function GoalsPage() {
         </div>
 
         {/* Goals List */}
+        {hasNoGoals ? (
+          <Card className="p-0">
+            <EmptyState
+              icon={<Target className="w-6 h-6" />}
+              title="No goals yet"
+              subtitle="Create a savings goal to track progress toward what matters — emergency fund, vacation, home down payment."
+              action={{ label: 'Create your first goal', onClick: () => { setEditingGoal(null); setShowForm(true); } }}
+            />
+          </Card>
+        ) : (
         <div className="space-y-4">
           {displayGoals.map((goal, idx) => {
             const progress = goal.target > 0 ? goal.current / goal.target : 0;
@@ -139,6 +172,24 @@ export default function GoalsPage() {
                           {formatCurrency(goal.current)}
                           <span className="text-flourish-muted font-normal text-sm"> / {formatCurrency(goal.target)}</span>
                         </p>
+                        {!isMock && (
+                          <button
+                            onClick={() => setContributionGoal(goal as Goal)}
+                            title="Log contribution"
+                            className="p-1.5 rounded-lg text-flourish-muted hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        )}
+                        {!isMock && (goal as Goal).contributions && ((goal as Goal).contributions!.length > 0) && (
+                          <button
+                            onClick={() => setHistoryGoal(goal as Goal)}
+                            title="View history"
+                            className="p-1.5 rounded-lg text-flourish-muted hover:text-flourish-dark hover:bg-flourish-hover transition-colors"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => { setEditingGoal(goal as Goal); setShowForm(true); }}
                           className="p-1.5 rounded-lg text-flourish-muted hover:text-flourish-dark hover:bg-flourish-hover transition-colors"
@@ -184,6 +235,7 @@ export default function GoalsPage() {
             );
           })}
         </div>
+        )}
       </div>
 
       {/* Form Modal */}
@@ -194,6 +246,155 @@ export default function GoalsPage() {
           onClose={() => { setShowForm(false); setEditingGoal(null); }}
         />
       )}
+
+      {contributionGoal && (
+        <ContributionForm
+          goal={contributionGoal}
+          onSave={(amount, note) => handleLogContribution(contributionGoal, amount, note)}
+          onClose={() => setContributionGoal(null)}
+        />
+      )}
+
+      {historyGoal && (
+        <ContributionHistory
+          goal={historyGoal}
+          onClose={() => setHistoryGoal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ContributionForm({
+  goal,
+  onSave,
+  onClose,
+}: {
+  goal: Goal;
+  onSave: (amount: number, note: string) => void;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [isWithdrawal, setIsWithdrawal] = useState(false);
+
+  useModal(onClose);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = parseFloat(amount);
+    if (!value || value <= 0) return;
+    onSave(isWithdrawal ? -value : value, note);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-flourish-border">
+          <div>
+            <h2 className="font-display text-lg font-bold text-flourish-dark">Log contribution</h2>
+            <p className="text-xs text-flourish-secondary">{goal.icon} {goal.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-flourish-hover transition-colors">
+            <X size={18} className="text-flourish-secondary" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsWithdrawal(false)}
+              className={cn(
+                'flex-1 py-2 text-sm font-medium rounded-xl transition-colors',
+                !isWithdrawal ? 'bg-emerald-500 text-white' : 'border border-flourish-border text-flourish-dark hover:bg-flourish-hover'
+              )}
+            >
+              Deposit
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsWithdrawal(true)}
+              className={cn(
+                'flex-1 py-2 text-sm font-medium rounded-xl transition-colors',
+                isWithdrawal ? 'bg-red-500 text-white' : 'border border-flourish-border text-flourish-dark hover:bg-flourish-hover'
+              )}
+            >
+              Withdraw
+            </button>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-1.5">Amount</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              autoFocus
+              placeholder="250"
+              className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-flourish-dark mb-1.5">Note (optional)</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g., Tax refund"
+              className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-flourish-dark border border-flourish-border rounded-xl hover:bg-flourish-hover transition-colors">
+              Cancel
+            </button>
+            <button type="submit" className="flex-1 py-2.5 text-sm font-semibold text-white bg-flourish-orange rounded-xl hover:bg-orange-600 transition-colors">
+              Log it
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ContributionHistory({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+  useModal(onClose);
+  const entries = [...(goal.contributions || [])].sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-flourish-border">
+          <div>
+            <h2 className="font-display text-lg font-bold text-flourish-dark">Contribution history</h2>
+            <p className="text-xs text-flourish-secondary">{goal.icon} {goal.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-flourish-hover transition-colors">
+            <X size={18} className="text-flourish-secondary" />
+          </button>
+        </div>
+        <div className="max-h-96 overflow-y-auto divide-y divide-flourish-border">
+          {entries.length === 0 ? (
+            <p className="p-6 text-center text-sm text-flourish-secondary">No contributions logged yet.</p>
+          ) : entries.map((c, i) => (
+            <div key={i} className="flex items-center justify-between px-6 py-3">
+              <div>
+                <p className="text-sm font-medium text-flourish-dark">
+                  {new Date(c.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+                {c.note && <p className="text-xs text-flourish-secondary">{c.note}</p>}
+              </div>
+              <span className={cn('font-display font-semibold', c.amount >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                {c.amount >= 0 ? '+' : ''}{formatCurrency(c.amount)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -214,6 +415,8 @@ function GoalForm({
   const [monthlyContribution, setMonthlyContribution] = useState(initial?.monthlyContribution?.toString() || '0');
   const [icon, setIcon] = useState(initial?.icon || '🎯');
   const [color, setColor] = useState(initial?.color || '#10b981');
+
+  useModal(onClose);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, X, Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
+import { useModal } from '@/lib/use-modal';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -49,6 +50,8 @@ export function AIChatPanel({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useModal(open ? onClose : null);
 
   useEffect(() => {
     if (open) {

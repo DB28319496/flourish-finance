@@ -14,6 +14,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import { cn } from "@/lib/utils";
+import { useModal } from "@/lib/use-modal";
 
 // =============================================================================
 // Budget Page — Monarch-style table layout
@@ -545,6 +546,7 @@ function AddCategoryModal({
   onSave: (meta: { name: string; emoji: string; section: typeof section }, amount: number) => Promise<void>;
   onClose: () => void;
 }) {
+  useModal(onClose);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(section === "income" ? "💵" : "💰");
   const [amount, setAmount] = useState("");

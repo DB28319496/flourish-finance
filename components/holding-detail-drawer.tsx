@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { useQuotes, useHistory, useNews, formatRelativeTime } from '@/lib/use-market-data';
 import { formatCurrency } from '@/lib/mock-data';
 import { getMerchantColor, cn } from '@/lib/utils';
+import { useModal } from '@/lib/use-modal';
 
 interface HoldingDetailProps {
   holding: {
@@ -30,6 +31,7 @@ const RANGES = [
 ];
 
 export function HoldingDetailDrawer({ holding, onClose }: HoldingDetailProps) {
+  useModal(holding ? onClose : null);
   const [range, setRange] = useState('3mo');
   const ticker = holding?.ticker || '';
   const { quotes } = useQuotes(ticker ? [ticker] : []);

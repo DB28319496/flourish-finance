@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useData } from '@/lib/data-context';
 import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { cn } from '@/lib/utils';
+import { useModal } from '@/lib/use-modal';
 
 interface Step {
   title: string;
@@ -81,6 +82,8 @@ export function OnboardingTour({
   const router = useRouter();
   const { user } = useAuth();
   const { linkedItems, updateUserSetting } = useData();
+
+  useModal(open ? onComplete : null);
 
   if (!open) return null;
 

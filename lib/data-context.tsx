@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "./auth-context";
+import { useToast } from "@/components/toast";
 import type { PlaidAccount, PlaidTransaction } from "./plaid-service";
 import {
   accountGroups as mockAccountGroups,
@@ -468,6 +469,7 @@ async function apiFetch(path: string, token: string, body?: Record<string, unkno
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { user, getIdToken } = useAuth();
+  const toast = useToast();
 
   const [accounts, setAccounts] = useState<PlaidAccount[]>([]);
   const [rawTransactions, setRawTransactions] = useState<PlaidTransaction[]>([]);
@@ -747,8 +749,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.error("Failed to refresh accounts:", err);
       setError(err.message);
+      toast.error("Couldn't load accounts. Check your connection and try again.");
     }
-  }, [getIdToken]);
+  }, [getIdToken, toast]);
 
   const refreshTransactions = useCallback(async (days = 90) => {
     const token = await getIdToken();
@@ -759,8 +762,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.error("Failed to refresh transactions:", err);
       setError(err.message);
+      toast.error("Couldn't load transactions. Please try again.");
     }
-  }, [getIdToken]);
+  }, [getIdToken, toast]);
 
   const refreshInvestments = useCallback(async () => {
     const token = await getIdToken();

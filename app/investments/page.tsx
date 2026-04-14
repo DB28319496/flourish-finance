@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, TrendingUp, TrendingDown, AlertTriangle, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
-import { Card, PillToggle, Badge, Dropdown } from '@/components/ui';
+import { Card, PillToggle, Badge, Dropdown, EmptyState } from '@/components/ui';
 import { PlaidLinkButton } from '@/components/plaid-link-button';
 import { HoldingDetailDrawer } from '@/components/holding-detail-drawer';
 import { PortfolioAICard } from '@/components/portfolio-ai-card';
@@ -221,6 +221,18 @@ export default function InvestmentsPage() {
             options={accountOptions}
           />
         </div>
+
+        {/* Empty state: no investment accounts connected at all */}
+        {!isUsingMockData && investmentAccountsCount === 0 && holdingGroups.length === 0 ? (
+          <Card className="p-0">
+            <EmptyState
+              icon={<BarChart3 className="w-6 h-6" />}
+              title="No investment accounts connected"
+              subtitle="Connect a brokerage or retirement account to see your holdings, performance, sector allocation, and AI-powered portfolio insights."
+              action={{ label: 'Connect an account', href: '/accounts' }}
+            />
+          </Card>
+        ) : <>
 
         {/* Empty state: investment accounts exist but holdings endpoint fails */}
         {hasInvestmentAccountsButNoHoldings && (
@@ -684,6 +696,7 @@ export default function InvestmentsPage() {
             </Card>
           </div>
         )}
+        </>}
       </div>
 
       {/* Holding Detail Drawer */}

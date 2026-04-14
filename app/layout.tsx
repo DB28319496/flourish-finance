@@ -7,6 +7,8 @@ import { AuthProvider } from '@/lib/auth-context';
 import { DataProvider } from '@/lib/data-context';
 import { AuthGate } from '@/components/auth-gate';
 import { OnboardingGate } from '@/components/onboarding-gate';
+import { ToastProvider } from '@/components/toast';
+import { SessionTimeout } from '@/components/session-timeout';
 import { Menu } from 'lucide-react';
 import '@/app/globals.css';
 
@@ -21,12 +23,15 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-flourish-cream grain-overlay">
         <AuthProvider>
-          <DataProvider>
-            <AuthGate>
-              <AppShell>{children}</AppShell>
-              <OnboardingGate />
-            </AuthGate>
-          </DataProvider>
+          <ToastProvider>
+            <DataProvider>
+              <AuthGate>
+                <AppShell>{children}</AppShell>
+                <OnboardingGate />
+                <SessionTimeout />
+              </AuthGate>
+            </DataProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useData } from '@/lib/data-context';
 import { formatCurrency } from '@/lib/mock-data';
 import { getMerchantColor } from '@/lib/utils';
+import { useModal } from '@/lib/use-modal';
 
 interface AccountDetailProps {
   accountId: string | null;
@@ -14,6 +15,7 @@ interface AccountDetailProps {
 }
 
 export function AccountDetailDrawer({ accountId, accountName, onClose }: AccountDetailProps) {
+  useModal(accountId ? onClose : null);
   const { transactionGroups, accountGroups } = useData();
   const router = useRouter();
 

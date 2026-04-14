@@ -249,16 +249,39 @@ export function EmptyState({
   icon,
   title,
   subtitle,
+  action,
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  action?: { label: string; onClick?: () => void; href?: string };
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-12 text-center">
-      <div className="text-flourish-tertiary">{icon}</div>
-      <p className="text-lg font-semibold text-flourish-text">{title}</p>
-      <p className="text-sm text-flourish-secondary">{subtitle}</p>
+    <div className="flex flex-col items-center gap-4 py-12 px-6 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-flourish-hover flex items-center justify-center text-flourish-tertiary">
+        {icon}
+      </div>
+      <div className="space-y-1">
+        <p className="font-display text-lg font-semibold text-flourish-text">{title}</p>
+        <p className="text-sm text-flourish-secondary max-w-sm mx-auto">{subtitle}</p>
+      </div>
+      {action && (
+        action.href ? (
+          <a
+            href={action.href}
+            className="px-4 py-2 bg-flourish-orange text-white rounded-flourish-lg hover:bg-orange-600 transition-colors font-body text-sm font-medium"
+          >
+            {action.label}
+          </a>
+        ) : (
+          <button
+            onClick={action.onClick}
+            className="px-4 py-2 bg-flourish-orange text-white rounded-flourish-lg hover:bg-orange-600 transition-colors font-body text-sm font-medium"
+          >
+            {action.label}
+          </button>
+        )
+      )}
     </div>
   );
 }

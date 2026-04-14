@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, List, Calendar, Plus, MoreVertical, ExternalLink, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Card, PillToggle, ProgressBar, Badge } from '@/components/ui';
+import { Card, PillToggle, ProgressBar, Badge, EmptyState } from '@/components/ui';
+import { Repeat } from 'lucide-react';
 import { formatCurrency, formatCurrencyShort } from '@/lib/mock-data';
 import { useData } from '@/lib/data-context';
 import { cn, getMerchantColor } from '@/lib/utils';
@@ -104,7 +105,7 @@ export default function RecurringPage() {
     }));
   };
 
-  const { recurringTransactions, userSettings, updateUserSetting } = useData();
+  const { recurringTransactions, userSettings, updateUserSetting, isUsingMockData } = useData();
   const router = useRouter();
 
   const viewTransactions = (merchant: string) => {
@@ -207,6 +208,18 @@ export default function RecurringPage() {
           </div>
         </Card>
 
+        {/* Empty state for real users with no detected recurring */}
+        {!isUsingMockData && incomeItems.length === 0 && expenseItems.length === 0 && creditCardItems.length === 0 ? (
+          <Card className="p-0">
+            <EmptyState
+              icon={<Repeat className="w-6 h-6" />}
+              title="No recurring items detected"
+              subtitle="We automatically detect subscriptions, bills, and paychecks from your transaction history. Once you have a few months of data, they'll appear here."
+              action={{ label: 'View transactions', href: '/transactions' }}
+            />
+          </Card>
+        ) : (
+        <>
         {/* Calendar View */}
         {viewMode === 'calendar' && (
           <RecurringCalendar
@@ -487,6 +500,8 @@ export default function RecurringPage() {
           </div>
         </div>
         </>}
+        </>
+        )}
       </div>
     </div>
   );

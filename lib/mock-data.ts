@@ -115,6 +115,12 @@ export interface Benchmark {
   color: string;
 }
 
+export interface GoalContribution {
+  date: string; // ISO YYYY-MM-DD
+  amount: number; // positive = deposit, negative = withdrawal
+  note?: string;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -125,6 +131,7 @@ export interface Goal {
   deadline: string;
   monthlyContribution: number;
   createdAt?: number;
+  contributions?: GoalContribution[];
 }
 
 export interface UserSettings {

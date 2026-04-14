@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import type { ManualAccount } from '@/lib/mock-data';
+import { useModal } from '@/lib/use-modal';
 
 const ACCOUNT_TYPES: { value: ManualAccount['type']; label: string; emoji: string; defaultSubtype: string }[] = [
   { value: 'cash', label: 'Cash', emoji: '💵', defaultSubtype: 'Checking' },
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function ManualAccountModal({ initial, onSave, onDelete, onClose }: Props) {
+  useModal(onClose);
   const [name, setName] = useState(initial?.name || '');
   const [institution, setInstitution] = useState(initial?.institution || '');
   const [type, setType] = useState<ManualAccount['type']>(initial?.type || 'cash');

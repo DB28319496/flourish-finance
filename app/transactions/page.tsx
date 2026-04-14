@@ -21,6 +21,7 @@ import {
 } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import { cn, getMerchantColor, getAccountColor, formatDate } from "@/lib/utils";
+import { useModal } from "@/lib/use-modal";
 
 // =============================================================================
 // Types
@@ -385,6 +386,7 @@ function TransactionDetailPanel({
   onClose,
   onEditingChange,
 }: TransactionDetailPanelProps) {
+  useModal(onClose);
   const merchantColor = getMerchantColor(transaction.merchantName);
   const [showSplit, setShowSplit] = useState(!!existingSplit);
   const [splitRows, setSplitRows] = useState<{ category: string; amount: number; notes?: string }[]>(

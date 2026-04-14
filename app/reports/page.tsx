@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Calendar, Settings, Save, BarChart3 } from 'lucide-react';
-import { Card, PillToggle, SectionHeader, ProgressBar, Badge, Dropdown } from '@/components/ui';
+import { Card, PillToggle, SectionHeader, ProgressBar, Badge, Dropdown, EmptyState } from '@/components/ui';
 import {
   formatCurrency,
   formatCurrencyShort,
@@ -23,7 +23,13 @@ export default function ReportsPage() {
   const [maxAmount, setMaxAmount] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
 
-  const { monthlyData, flatTransactions, transactionStats, rawTransactions, transferIds } = useData();
+  const { monthlyData, flatTransactions, transactionStats, rawTransactions, transferIds, isUsingMockData, accounts } = useData();
+  const hasNoData = !isUsingMockData && rawTransactions.length === 0;
+  const accountNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const a of accounts) m[a.account_id] = a.name;
+    return m;
+  }, [accounts]);
 
   // Apply date range filter to monthlyData
   const filteredMonthly = useMemo(() => {
@@ -84,16 +90,42 @@ export default function ReportsPage() {
   const savingsRateVal = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
 
   const handleExportCSV = () => {
-    const header = 'Date,Merchant,Category,Amount\n';
-    const rows = rawTransactions.map((t) =>
-      [t.date, `"${(t.merchant_name || t.name).replace(/"/g, '""')}"`, `"${(t.category?.[0] || 'Other').replace(/"/g, '""')}"`, (t.amount > 0 ? -t.amount : Math.abs(t.amount))].join(',')
-    ).join('\n');
+    // Derive date window from the current dateRange dropdown
+    const now = new Date();
+    let cutoff: Date | null = null;
+    if (dateRange === 'Last 30 Days') cutoff = new Date(now.getTime() - 30 * 86400000);
+    else if (dateRange === 'Last 3 Months') { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3); }
+    else if (dateRange === 'Last 6 Months') { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 6); }
+    else if (dateRange === 'Last 12 Months') { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 12); }
+    else if (dateRange === 'Year to Date') cutoff = new Date(now.getFullYear(), 0, 1);
+
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const filtered = cutoff
+      ? rawTransactions.filter((t) => new Date(t.date) >= cutoff!)
+      : rawTransactions;
+
+    const header = 'Date,Merchant,Category,Account,Amount,Type,Pending\n';
+    const rows = filtered.map((t) => {
+      const amount = t.amount > 0 ? -t.amount : Math.abs(t.amount);
+      const type = t.amount > 0 ? 'Expense' : 'Income';
+      return [
+        t.date,
+        esc(t.merchant_name || t.name),
+        esc(t.category?.[0] || 'Other'),
+        esc(accountNameById[t.account_id] || ''),
+        amount.toFixed(2),
+        type,
+        t.pending ? 'yes' : 'no',
+      ].join(',');
+    }).join('\n');
+
     const csv = header + rows;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `flourish-report-${new Date().toISOString().split('T')[0]}.csv`;
+    const rangeSlug = dateRange.toLowerCase().replace(/\s+/g, '-');
+    link.download = `flourish-${rangeSlug}-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -139,6 +171,17 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="font-display text-4xl font-bold text-flourish-text mb-6">Reports</h1>
+
+          {hasNoData && (
+            <Card className="p-0 mb-6">
+              <EmptyState
+                icon={<BarChart3 className="w-6 h-6" />}
+                title="No reports yet"
+                subtitle="Reports are generated from your transaction history. Connect an account to see spending, income, and cash-flow breakdowns."
+                action={{ label: 'Connect an account', href: '/accounts' }}
+              />
+            </Card>
+          )}
 
           {/* Tab Navigation */}
           <div className="flex gap-8 border-b border-flourish-border">

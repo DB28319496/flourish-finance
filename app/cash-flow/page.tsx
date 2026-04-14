@@ -11,8 +11,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
-import { Card, PillToggle, SectionHeader } from "@/components/ui";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { Card, PillToggle, SectionHeader, EmptyState } from "@/components/ui";
 import {
   formatCurrency,
   formatCurrencyShort,
@@ -32,7 +32,8 @@ export default function CashFlowPage() {
   const [incomeView, setIncomeView] = useState<BreakdownView>("Category");
   const [expenseView, setExpenseView] = useState<BreakdownView>("Category");
 
-  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown, rawTransactions, transferIds } = useData();
+  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown, rawTransactions, transferIds, isUsingMockData } = useData();
+  const hasNoData = !isUsingMockData && rawTransactions.length === 0;
 
   // Build merchant/group breakdowns from raw transactions — excluding transfers
   const currentMonthKey = new Date().toISOString().slice(0, 7);
@@ -178,6 +179,17 @@ export default function CashFlowPage() {
           </button>
         </div>
       </div>
+
+      {hasNoData && (
+        <Card className="p-0">
+          <EmptyState
+            icon={<TrendingUp className="w-6 h-6" />}
+            title="Not enough transaction data yet"
+            subtitle="Cash-flow trends appear once transactions start syncing. Connect an account to see income vs. spending over time."
+            action={{ label: 'Connect an account', href: '/accounts' }}
+          />
+        </Card>
+      )}
 
       {/* Year Navigation */}
       <div className="flex items-center justify-center gap-6">
