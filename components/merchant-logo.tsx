@@ -183,14 +183,18 @@ function guessDomain(name: string): string | null {
 
 /**
  * Returns an ordered list of logo URLs to try.
- * Uses multiple providers so if one is slow/down, we have backups.
+ * DuckDuckGo is the most reliable for brand icons (200 on virtually
+ * every domain with a favicon). Google is a backup — it returns 404
+ * for many domains (including capitalone.com).
  */
 function logoUrls(domain: string): string[] {
   return [
-    // Google's favicon API — extremely reliable, free, no auth
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    // DuckDuckGo's icon service — decent quality fallback
+    // DuckDuckGo's icon service — best hit rate, no auth, no CORS issues
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    // Google Favicons — fallback
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    // Direct favicon — last resort
+    `https://${domain}/favicon.ico`,
   ];
 }
 
