@@ -143,9 +143,14 @@ export default function RecurringPage() {
               value={filter}
               onChange={(val) => setFilter(val as RecurringFilter)}
             />
-            <button className="flex items-center gap-2 px-4 py-2 bg-flourish-orange text-white rounded-flourish-lg hover:bg-orange-600 transition-colors font-body text-sm font-medium">
-              <Plus className="w-4 h-4" />
-              Manage recurring
+            {/* Refresh data button — recurring items are auto-detected, so reload pulls fresh transactions */}
+            <button
+              onClick={() => window.location.reload()}
+              title="Refresh recurring detection"
+              className="flex items-center gap-2 px-4 py-2 border border-flourish-border text-flourish-dark rounded-flourish-lg hover:bg-flourish-hover transition-colors font-body text-sm font-medium"
+            >
+              <Plus className="w-4 h-4 rotate-45" />
+              Refresh
             </button>
           </div>
         </div>
@@ -233,13 +238,6 @@ export default function RecurringPage() {
                 Income
               </h2>
             </div>
-            <a
-              href="#"
-              className="text-flourish-orange hover:text-orange-600 font-body text-sm font-medium transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              + Add recurring income
-            </a>
           </button>
 
           {expandedSections.income && (
@@ -292,12 +290,6 @@ export default function RecurringPage() {
             <h2 className="font-display text-lg font-bold text-flourish-text">
               Expenses
             </h2>
-            <a
-              href="#"
-              className="text-flourish-orange hover:text-orange-600 font-body text-sm font-medium transition-colors"
-            >
-              + Set up bill sync
-            </a>
           </div>
 
           <Card className="p-6 mb-4 animate-slide-up stagger-2">
@@ -338,13 +330,6 @@ export default function RecurringPage() {
                 Credit Cards
               </h2>
             </div>
-            <a
-              href="#"
-              className="text-flourish-orange hover:text-orange-600 font-body text-sm font-medium transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              + Add card
-            </a>
           </button>
 
           {expandedSections.creditCards && (
@@ -483,7 +468,7 @@ export default function RecurringPage() {
                           {formatCurrencyShort(item.amount)}
                         </p>
                         <p className="font-body text-xs text-flourish-muted">
-                          3 days ago
+                          {item.nextDate || 'Paid'}
                         </p>
                       </div>
                       <ItemMenu

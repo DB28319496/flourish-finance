@@ -7,6 +7,24 @@ import { formatCurrency, type Goal } from '@/lib/mock-data';
 import { useData } from '@/lib/data-context';
 import { cn } from '@/lib/utils';
 
+// Convert a free-form deadline like "Dec 2026" to ISO date string for <input type="date">
+function dateStringToIso(str: string): string {
+  if (!str) return '';
+  // If already ISO, return as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const parsed = new Date(str);
+  if (isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().split('T')[0];
+}
+
+// Convert ISO date back to human-friendly "Jan 2028" format for storage/display
+function isoToMonthYear(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 const DEFAULT_GOALS: Omit<Goal, 'id' | 'createdAt'>[] = [
   { name: 'Emergency Fund', target: 15000, current: 10500, icon: '🛡️', color: '#10b981', deadline: 'Dec 2026', monthlyContribution: 500 },
   { name: 'Vacation Fund', target: 5000, current: 2800, icon: '✈️', color: '#3b82f6', deadline: 'Aug 2026', monthlyContribution: 300 },
@@ -266,10 +284,9 @@ function GoalForm({
             <div>
               <label className="block text-sm font-medium text-flourish-dark mb-1.5">Deadline</label>
               <input
-                type="text"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                placeholder="Dec 2026"
+                type="date"
+                value={dateStringToIso(deadline)}
+                onChange={(e) => setDeadline(isoToMonthYear(e.target.value))}
                 className="w-full px-3 py-2.5 border border-flourish-border rounded-xl text-sm text-flourish-dark bg-white focus:outline-none focus:ring-2 focus:ring-flourish-orange/30 focus:border-flourish-orange"
               />
             </div>

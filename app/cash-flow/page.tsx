@@ -32,13 +32,13 @@ export default function CashFlowPage() {
   const [incomeView, setIncomeView] = useState<BreakdownView>("Category");
   const [expenseView, setExpenseView] = useState<BreakdownView>("Category");
 
-  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown, rawTransactions } = useData();
+  const { cashFlowMonths, expensesByCategory: expenseBreakdown, incomeBySource: incomeBreakdown, rawTransactions, transferIds } = useData();
 
-  // Build merchant/group breakdowns from raw transactions
+  // Build merchant/group breakdowns from raw transactions — excluding transfers
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const currentMonthTxs = useMemo(
-    () => rawTransactions.filter((t) => t.date.startsWith(currentMonthKey)),
-    [rawTransactions, currentMonthKey]
+    () => rawTransactions.filter((t) => t.date.startsWith(currentMonthKey) && !transferIds.has(t.transaction_id)),
+    [rawTransactions, currentMonthKey, transferIds]
   );
 
   // Group (top-level Plaid category) breakdown

@@ -23,7 +23,7 @@ export default function ReportsPage() {
   const [maxAmount, setMaxAmount] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
 
-  const { monthlyData, flatTransactions, transactionStats, rawTransactions } = useData();
+  const { monthlyData, flatTransactions, transactionStats, rawTransactions, transferIds } = useData();
 
   // Apply date range filter to monthlyData
   const filteredMonthly = useMemo(() => {
@@ -36,6 +36,7 @@ export default function ReportsPage() {
   const yearlyData = useMemo(() => {
     const byYear: Record<string, { income: number; expenses: number }> = {};
     for (const tx of rawTransactions) {
+      if (transferIds.has(tx.transaction_id)) continue; // exclude transfers
       const year = tx.date.slice(0, 4);
       if (!byYear[year]) byYear[year] = { income: 0, expenses: 0 };
       if (tx.amount < 0) byYear[year].income += Math.abs(tx.amount);
@@ -48,7 +49,7 @@ export default function ReportsPage() {
         income: Math.round(data.income * 100) / 100,
         expenses: Math.round(data.expenses * 100) / 100,
       }));
-  }, [rawTransactions]);
+  }, [rawTransactions, transferIds]);
 
   // The chart data depends on grouping
   const chartData = grouping === 'yearly' ? yearlyData : filteredMonthly;

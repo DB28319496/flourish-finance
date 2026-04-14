@@ -153,6 +153,20 @@ export default function SettingsPage() {
                       <option value="GBP">GBP (&pound;)</option>
                     </select>
                   </div>
+
+                  <div className="pt-3 border-t border-flourish-border">
+                    <p className="text-sm font-medium text-flourish-dark mb-1.5">Replay onboarding tour</p>
+                    <p className="text-xs text-flourish-secondary mb-3">Re-watch the quick walkthrough of Flourish features.</p>
+                    <button
+                      onClick={async () => {
+                        await updateUserSetting('onboardingCompleted', false);
+                        window.location.reload();
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-flourish-orange border border-flourish-orange rounded-lg hover:bg-orange-50 transition-colors"
+                    >
+                      Start tour again
+                    </button>
+                  </div>
                 </div>
               </Card>
             )}

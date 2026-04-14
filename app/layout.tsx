@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/sidebar';
 import { AuthProvider } from '@/lib/auth-context';
 import { DataProvider } from '@/lib/data-context';
 import { AuthGate } from '@/components/auth-gate';
+import { OnboardingGate } from '@/components/onboarding-gate';
 import { Menu } from 'lucide-react';
 import '@/app/globals.css';
 
@@ -23,6 +24,7 @@ export default function RootLayout({
           <DataProvider>
             <AuthGate>
               <AppShell>{children}</AppShell>
+              <OnboardingGate />
             </AuthGate>
           </DataProvider>
         </AuthProvider>

@@ -25,7 +25,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ['"Instrument Serif"', 'Georgia', 'serif'],
+        display: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
         sans: ['"Geist"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Geist Mono"', '"JetBrains Mono"', 'monospace'],

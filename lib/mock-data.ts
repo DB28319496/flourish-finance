@@ -142,6 +142,7 @@ export interface UserSettings {
   categoryOverrides?: Record<string, string>; // plaidCategoryName -> renamedCategory
   manualTransferIds?: string[]; // transaction_ids user manually marked as transfers
   nonTransferIds?: string[]; // transaction_ids user manually un-marked as transfers
+  onboardingCompleted?: boolean; // user finished the onboarding walkthrough
 }
 
 export interface CategorizationRule {

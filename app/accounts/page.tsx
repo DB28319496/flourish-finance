@@ -93,9 +93,22 @@ export default function AccountsPage() {
     addManualAccount,
     updateManualAccount,
     deleteManualAccount,
+    refreshAccounts,
+    refreshTransactions,
+    refreshInvestments,
     isLoading,
     isUsingMockData,
   } = useData();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refreshAccounts(), refreshTransactions(90), refreshInvestments()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [manualAccountModal, setManualAccountModal] = useState<ManualAccount | null | 'new'>(null);
@@ -165,6 +178,16 @@ export default function AccountsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!isUsingMockData && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-4 py-2.5 rounded-xl border border-flourish-border text-sm font-medium text-flourish-dark hover:bg-flourish-hover transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <span className={cn("inline-block", refreshing && "animate-spin")}>↻</span>
+              {refreshing ? 'Syncing...' : 'Refresh'}
+            </button>
+          )}
           <button
             onClick={() => setManualAccountModal('new')}
             className="px-4 py-2.5 rounded-xl border border-flourish-border text-sm font-medium text-flourish-dark hover:bg-flourish-hover transition-colors"
