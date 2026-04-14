@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { rateLimit } from "@/lib/rate-limit";
 
 // =============================================================================
 // Tool Definitions — what the AI can do on the user's behalf
@@ -303,6 +304,10 @@ async function executeTool(name: string, input: any, uid: string): Promise<{ suc
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // 20 chat messages per minute per user (Claude costs money)
+  const limited = rateLimit(`chat:${uid}`, { limit: 20, windowMs: 60_000 });
+  if (limited) return limited;
 
   const { message, conversationHistory = [], financialContext = "" } = await req.json();
   if (!message) return NextResponse.json({ error: "message is required" }, { status: 400 });

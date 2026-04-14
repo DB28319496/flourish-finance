@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyIdToken } from "@/lib/firebase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 const cache = new Map<string, { data: any; expires: number }>();
 const CACHE_MS = 15 * 60_000; // 15 min
@@ -11,6 +13,11 @@ const USER_AGENT =
  * Returns recent news articles for these symbols.
  */
 export async function GET(req: NextRequest) {
+  const uid = await verifyIdToken(req.headers.get("authorization"));
+  const limitKey = uid || `ip:${req.headers.get("x-forwarded-for") || "unknown"}`;
+  const limited = rateLimit(limitKey, { limit: 30, windowMs: 60_000 });
+  if (limited) return limited;
+
   const symbolsParam = req.nextUrl.searchParams.get("symbols");
   if (!symbolsParam) return NextResponse.json({ error: "symbols required" }, { status: 400 });
 

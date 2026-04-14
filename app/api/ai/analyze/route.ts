@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/firebase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
@@ -94,6 +95,10 @@ ${ctx}`,
 export async function POST(req: NextRequest) {
   const uid = await verifyIdToken(req.headers.get("authorization"));
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // 10 analysis requests per 5 minutes per user (each is 2K tokens of Claude)
+  const limited = rateLimit(`analyze:${uid}`, { limit: 10, windowMs: 5 * 60_000 });
+  if (limited) return limited;
 
   const { type, financialContext = "" } = await req.json();
   if (!type || !PROMPTS[type]) {

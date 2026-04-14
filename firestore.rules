@@ -1,0 +1,156 @@
+rules_version = '2';
+
+// Flourish Finance — Firestore Security Rules
+//
+// Enforces strict per-user and per-household isolation:
+// 1. Users can only read/write their own profile + subcollections
+// 2. Household data is accessible to all household members
+// 3. Plaid access tokens are server-only (default-denied for clients)
+// 4. Default-deny anything not explicitly allowed
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===========================================
+    // HELPER FUNCTIONS
+    // ===========================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function currentUserId() {
+      return request.auth.uid;
+    }
+
+    function isSelf(uid) {
+      return isAuthenticated() && currentUserId() == uid;
+    }
+
+    function isHouseholdMember(householdId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/households/$(householdId)) &&
+        currentUserId() in get(/databases/$(database)/documents/households/$(householdId)).data.memberUserIDs;
+    }
+
+    function isHouseholdOwner(householdId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/households/$(householdId)) &&
+        currentUserId() == get(/databases/$(database)/documents/households/$(householdId)).data.ownerUserID;
+    }
+
+    function isValidString(field) {
+      return field is string && field.size() > 0;
+    }
+
+    function isValidInviteCode(code) {
+      return code is string && code.size() == 6;
+    }
+
+    // ===========================================
+    // USERS COLLECTION — profile + all user data
+    // ===========================================
+
+    match /users/{userId} {
+      allow read, write: if isSelf(userId);
+
+      // Explicit subcollection access — covers everything the web app
+      // writes client-side: goals, settings, transaction_edits, snapshots,
+      // rules, transaction_splits, manual_accounts, etc.
+      match /{subcollection}/{docId=**} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // ===========================================
+    // HOUSEHOLDS COLLECTION
+    // ===========================================
+
+    match /households/{householdId} {
+      allow read: if isHouseholdMember(householdId);
+
+      // Anyone authenticated can create a household (they become owner)
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerUserID == currentUserId() &&
+        currentUserId() in request.resource.data.memberUserIDs &&
+        isValidString(request.resource.data.name);
+
+      // Members can update, but the owner field cannot be changed
+      allow update: if isHouseholdMember(householdId) &&
+        request.resource.data.ownerUserID == resource.data.ownerUserID;
+
+      // Only owner can delete
+      allow delete: if isHouseholdOwner(householdId);
+
+      match /members/{memberId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId);
+        allow update, delete: if isHouseholdOwner(householdId) || currentUserId() == memberId;
+      }
+
+      match /financialData/{docId} {
+        allow read, write: if isHouseholdMember(householdId);
+      }
+
+      // Catch-all for any other household subcollections
+      match /{subcollection}/{docId=**} {
+        allow read, write: if isHouseholdMember(householdId);
+      }
+    }
+
+    // ===========================================
+    // INVITES & INVITE CODES (household invitations)
+    // ===========================================
+
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        isHouseholdMember(request.resource.data.householdId) &&
+        isValidInviteCode(request.resource.data.code);
+      allow delete: if isAuthenticated() && (
+        resource.data.createdBy == currentUserId() ||
+        isHouseholdOwner(resource.data.householdId)
+      );
+      allow update: if false;
+    }
+
+    match /inviteCodes/{code} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        isHouseholdMember(request.resource.data.householdId) &&
+        isValidInviteCode(code);
+      allow delete: if isAuthenticated() && (
+        resource.data.createdBy == currentUserId() ||
+        isHouseholdOwner(resource.data.householdId)
+      );
+      allow update: if false;
+    }
+
+    // ===========================================
+    // ROOT-LEVEL financialData (iOS legacy collection)
+    // Keyed by user ID — only owner can access
+    // ===========================================
+
+    match /financialData/{userId} {
+      allow read, write: if isSelf(userId);
+    }
+
+    // ===========================================
+    // plaid_access_tokens — SERVER ONLY
+    // Client SDK must never touch these. Only our Next.js API
+    // routes (using Firebase Admin SDK) can read/write tokens.
+    // ===========================================
+
+    match /plaid_access_tokens/{itemId} {
+      allow read, write: if false;
+    }
+
+    // ===========================================
+    // DEFAULT DENY — catches anything not explicitly allowed
+    // ===========================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

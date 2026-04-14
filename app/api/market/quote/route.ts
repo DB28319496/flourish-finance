@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyIdToken } from "@/lib/firebase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 // Cache responses in memory for 60 seconds to stay under rate limits
 const cache = new Map<string, { data: any; expires: number }>();
@@ -12,6 +14,12 @@ const USER_AGENT =
  * Returns latest price + day change for each symbol.
  */
 export async function GET(req: NextRequest) {
+  const uid = await verifyIdToken(req.headers.get("authorization") || `Bearer ${req.nextUrl.searchParams.get("token") || ""}`);
+  // Allow unauthenticated for now but rate-limit aggressively by IP
+  const limitKey = uid || `ip:${req.headers.get("x-forwarded-for") || "unknown"}`;
+  const limited = rateLimit(limitKey, { limit: 60, windowMs: 60_000 });
+  if (limited) return limited;
+
   const symbolsParam = req.nextUrl.searchParams.get("symbols");
   if (!symbolsParam) {
     return NextResponse.json({ error: "symbols param required" }, { status: 400 });

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyIdToken } from "@/lib/firebase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 const cache = new Map<string, { data: any; expires: number }>();
 const CACHE_MS = 5 * 60_000; // 5 min
@@ -11,6 +13,11 @@ const USER_AGENT =
  * Returns OHLC candles. Range: 1d,5d,1mo,3mo,6mo,1y,2y,5y,max
  */
 export async function GET(req: NextRequest) {
+  const uid = await verifyIdToken(req.headers.get("authorization"));
+  const limitKey = uid || `ip:${req.headers.get("x-forwarded-for") || "unknown"}`;
+  const limited = rateLimit(limitKey, { limit: 120, windowMs: 60_000 });
+  if (limited) return limited;
+
   const symbol = req.nextUrl.searchParams.get("symbol");
   const range = req.nextUrl.searchParams.get("range") || "3mo";
   if (!symbol) return NextResponse.json({ error: "symbol required" }, { status: 400 });
