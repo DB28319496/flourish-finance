@@ -212,7 +212,98 @@ function plaidAccountsToGroups(accounts: PlaidAccount[]): AccountGroup[] {
     });
 }
 
-function getCategoryEmoji(category: string[] | null, merchantName: string | null): { name: string; emoji: string; group: string } {
+// Plaid's Personal Finance Category → display name + emoji
+const PFC_MAP: Record<string, { name: string; group: string; emoji: string }> = {
+  INCOME: { name: "Income", group: "Income", emoji: "💵" },
+  TRANSFER_IN: { name: "Transfer In", group: "Transfer", emoji: "↔️" },
+  TRANSFER_OUT: { name: "Transfer Out", group: "Transfer", emoji: "↔️" },
+  LOAN_PAYMENTS: { name: "Loan Payment", group: "Payment", emoji: "💳" },
+  BANK_FEES: { name: "Bank Fees", group: "Fees", emoji: "🏦" },
+  ENTERTAINMENT: { name: "Entertainment", group: "Entertainment", emoji: "🎬" },
+  FOOD_AND_DRINK: { name: "Food & Drink", group: "Food & Dining", emoji: "🍽" },
+  GENERAL_MERCHANDISE: { name: "Shopping", group: "Shopping", emoji: "🛍" },
+  HOME_IMPROVEMENT: { name: "Home Improvement", group: "Housing", emoji: "🔨" },
+  MEDICAL: { name: "Medical", group: "Health", emoji: "💊" },
+  PERSONAL_CARE: { name: "Personal Care", group: "Personal", emoji: "💇" },
+  GENERAL_SERVICES: { name: "Services", group: "Services", emoji: "🔧" },
+  GOVERNMENT_AND_NON_PROFIT: { name: "Government", group: "Other", emoji: "🏛" },
+  TRANSPORTATION: { name: "Transportation", group: "Auto & Transport", emoji: "🚗" },
+  TRAVEL: { name: "Travel", group: "Travel", emoji: "✈️" },
+  RENT_AND_UTILITIES: { name: "Rent & Utilities", group: "Housing", emoji: "🏠" },
+};
+
+// Detailed PFC → more specific name + emoji
+const PFC_DETAILED_MAP: Record<string, { name: string; emoji: string }> = {
+  FOOD_AND_DRINK_RESTAURANT: { name: "Restaurants", emoji: "🍽" },
+  FOOD_AND_DRINK_FAST_FOOD: { name: "Fast Food", emoji: "🍔" },
+  FOOD_AND_DRINK_COFFEE: { name: "Coffee Shops", emoji: "☕️" },
+  FOOD_AND_DRINK_GROCERIES: { name: "Groceries", emoji: "🛒" },
+  FOOD_AND_DRINK_ALCOHOL_AND_BARS: { name: "Bars", emoji: "🍺" },
+  TRANSPORTATION_GAS: { name: "Gas", emoji: "⛽" },
+  TRANSPORTATION_PARKING: { name: "Parking", emoji: "🅿️" },
+  TRANSPORTATION_PUBLIC_TRANSIT: { name: "Transit", emoji: "🚇" },
+  TRANSPORTATION_TAXIS_AND_RIDE_SHARES: { name: "Ride Share", emoji: "🚕" },
+  RENT_AND_UTILITIES_RENT: { name: "Rent", emoji: "🏠" },
+  RENT_AND_UTILITIES_GAS_AND_ELECTRICITY: { name: "Gas & Electric", emoji: "⚡" },
+  RENT_AND_UTILITIES_INTERNET_AND_CABLE: { name: "Internet & Cable", emoji: "🌐" },
+  RENT_AND_UTILITIES_TELEPHONE: { name: "Phone", emoji: "📱" },
+  RENT_AND_UTILITIES_WATER: { name: "Water", emoji: "💧" },
+  GENERAL_MERCHANDISE_CLOTHING_AND_ACCESSORIES: { name: "Clothing", emoji: "👕" },
+  GENERAL_MERCHANDISE_ELECTRONICS: { name: "Electronics", emoji: "💻" },
+  GENERAL_MERCHANDISE_ONLINE_MARKETPLACES: { name: "Online Shopping", emoji: "🛒" },
+  GENERAL_MERCHANDISE_PET_SUPPLIES: { name: "Pet Supplies", emoji: "🐾" },
+  ENTERTAINMENT_TV_AND_MOVIES: { name: "Streaming", emoji: "🎬" },
+  ENTERTAINMENT_MUSIC_AND_AUDIO: { name: "Music", emoji: "🎵" },
+  ENTERTAINMENT_VIDEO_GAMES: { name: "Video Games", emoji: "🎮" },
+  PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS: { name: "Fitness", emoji: "💪" },
+  PERSONAL_CARE_HAIR_AND_BEAUTY: { name: "Beauty & Salon", emoji: "💇" },
+  MEDICAL_DENTAL_CARE: { name: "Dental", emoji: "🦷" },
+  MEDICAL_PHARMACIES_AND_SUPPLEMENTS: { name: "Pharmacy", emoji: "💊" },
+  MEDICAL_PRIMARY_CARE: { name: "Doctor", emoji: "🩺" },
+  LOAN_PAYMENTS_CREDIT_CARD_PAYMENT: { name: "Credit Card Payment", emoji: "💳" },
+  LOAN_PAYMENTS_MORTGAGE_PAYMENT: { name: "Mortgage", emoji: "🏠" },
+  LOAN_PAYMENTS_CAR_PAYMENT: { name: "Car Payment", emoji: "🚗" },
+  LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT: { name: "Student Loan", emoji: "🎓" },
+  INCOME_WAGES: { name: "Paycheck", emoji: "💵" },
+  INCOME_DIVIDENDS: { name: "Dividends", emoji: "💰" },
+  INCOME_INTEREST_EARNED: { name: "Interest", emoji: "💰" },
+  INCOME_RETIREMENT_PENSION: { name: "Retirement", emoji: "💰" },
+  TRAVEL_FLIGHTS: { name: "Flights", emoji: "✈️" },
+  TRAVEL_LODGING: { name: "Lodging", emoji: "🏨" },
+  TRANSFER_IN_DEPOSIT: { name: "Deposit", emoji: "↔️" },
+  TRANSFER_OUT_WITHDRAWAL: { name: "Withdrawal", emoji: "↔️" },
+};
+
+function prettifyEnum(s: string): string {
+  return s
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function getCategoryEmoji(
+  category: string[] | null,
+  merchantName: string | null,
+  pfc?: { primary?: string; detailed?: string } | null
+): { name: string; emoji: string; group: string } {
+  // Prefer Plaid's Personal Finance Category when available
+  if (pfc?.detailed && PFC_DETAILED_MAP[pfc.detailed]) {
+    const m = PFC_DETAILED_MAP[pfc.detailed];
+    const primary = pfc.primary ? PFC_MAP[pfc.primary] : null;
+    return { name: m.name, emoji: m.emoji, group: primary ? primary.group : m.name };
+  }
+  if (pfc?.primary && PFC_MAP[pfc.primary]) {
+    return PFC_MAP[pfc.primary];
+  }
+  // Use detailed PFC even if not in our map, derive readable name
+  if (pfc?.detailed) {
+    const primary = pfc.primary ? PFC_MAP[pfc.primary] : null;
+    const name = prettifyEnum(pfc.detailed);
+    return { name, emoji: primary ? primary.emoji : "💰", group: primary ? primary.group : "Other" };
+  }
+
+  // Fall back to legacy category array
   const cat = category?.[0] || "Other";
   const sub = category?.[1] || cat;
   const emojiMap: Record<string, string> = {
@@ -243,7 +334,7 @@ function plaidTransactionsToGroups(
       originalStatement: tx.name,
       amount: Math.abs(tx.amount),
       date: tx.date,
-      category: getCategoryEmoji(tx.category, tx.merchant_name),
+      category: getCategoryEmoji(tx.category, tx.merchant_name, (tx as any).personal_finance_category),
       accountName,
       accountId: tx.account_id,
       isPending: tx.pending,

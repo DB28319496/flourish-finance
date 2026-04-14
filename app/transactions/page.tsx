@@ -28,6 +28,21 @@ import { cn, getMerchantColor, getAccountColor, formatDate } from "@/lib/utils";
 
 type FilterTab = "All" | "Receipts";
 
+// Common category names — used as autocomplete suggestions in the detail panel
+const CATEGORY_SUGGESTIONS = [
+  "Groceries", "Restaurants", "Coffee Shops", "Fast Food", "Bars",
+  "Gas", "Ride Share", "Parking", "Transit", "Auto Payment",
+  "Rent", "Mortgage", "Gas & Electric", "Internet & Cable", "Phone",
+  "Water", "Insurance", "Home Improvement",
+  "Streaming", "Music", "Video Games", "Entertainment",
+  "Shopping", "Clothing", "Electronics", "Online Shopping", "Pet Supplies",
+  "Fitness", "Beauty & Salon", "Dental", "Pharmacy", "Doctor", "Medical",
+  "Travel", "Flights", "Lodging",
+  "Paycheck", "Dividends", "Interest", "Refund", "Gift",
+  "Credit Card Payment", "Student Loan", "Transfer",
+  "Subscriptions", "Charity", "Taxes", "Fees", "Cash", "Other",
+];
+
 // =============================================================================
 // Main Page
 // =============================================================================
@@ -483,15 +498,31 @@ function TransactionDetailPanel({
             />
           </div>
 
-          {/* Category */}
+          {/* Category — editable */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-flourish-tertiary">
               Category
             </label>
-            <div className="mt-2 rounded-lg bg-flourish-bg px-3 py-2">
-              <span className="text-sm text-flourish-text">
-                {editingTransaction.category.emoji} {editingTransaction.category.name}
-              </span>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-lg">{editingTransaction.category.emoji}</span>
+              <input
+                type="text"
+                value={editingTransaction.category.name}
+                onChange={(e) =>
+                  onEditingChange({
+                    ...editingTransaction,
+                    category: { ...editingTransaction.category, name: e.target.value },
+                  })
+                }
+                placeholder="Category"
+                list="category-suggestions"
+                className="flex-1 rounded-lg border border-flourish-bg bg-flourish-card px-3 py-2 text-sm text-flourish-text placeholder-flourish-tertiary transition-colors focus:border-flourish-orange focus:outline-none"
+              />
+              <datalist id="category-suggestions">
+                {CATEGORY_SUGGESTIONS.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
           </div>
 
